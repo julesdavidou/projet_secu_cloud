@@ -1,0 +1,18 @@
+# Local configuration
+.env
+
+# Compiled binaries
+bin/
+
+# Local data
+data/
+
+# Logs
+*.log
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,45 @@
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+
+RUN go mod download
+
+COPY . .
+
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN CGO_ENABLED=0 \
+    GOOS=$TARGETOS \
+    GOARCH=$TARGETARCH \
+    go build \
+    -trimpath \
+    -ldflags="-s -w" \
+    -o /out/edge-agent \
+    ./cmd/edge-agent
+
+
+FROM alpine:3.22
+
+RUN addgroup -S -g 10001 edge \
+    && adduser -S -u 10001 -G edge edge \
+    && mkdir -p /data \
+    && chown -R edge:edge /data
+
+COPY --from=builder \
+    /out/edge-agent \
+    /usr/local/bin/edge-agent
+
+USER edge
+
+EXPOSE 8080
+
+HEALTHCHECK \
+    --interval=10s \
+    --timeout=3s \
+    --retries=3 \
+    CMD wget -q -O - http://127.0.0.1:8080/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/edge-agent"]

@@ -1,0 +1,65 @@
+services:
+
+  mqtt:
+    image: eclipse-mosquitto:2
+
+    profiles:
+      - local
+
+    ports:
+      - "127.0.0.1:1883:1883"
+
+    volumes:
+      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+    networks:
+      - control
+
+
+  edge-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.edge-agent
+
+    environment:
+      EDGE_ID: ${EDGE_ID:-edge-dev-01}
+      EDGE_ZONE: ${EDGE_ZONE:-dev}
+
+      MQTT_BROKER: ${MQTT_BROKER:-tcp://mqtt:1883}
+
+      HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-5s}
+
+      STORAGE_ROOT: /data
+
+    ports:
+      - "127.0.0.1:${EDGE_HTTP_PORT:-8080}:8080"
+
+    volumes:
+      - edge-data:/data
+
+    networks:
+      - control
+
+    restart: unless-stopped
+
+    read_only: true
+
+    tmpfs:
+      - /tmp
+
+    cap_drop:
+      - ALL
+
+    security_opt:
+      - no-new-privileges:true
+
+
+networks:
+
+  control:
+    driver: bridge
+
+
+volumes:
+
+  edge-data:
