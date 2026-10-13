@@ -127,4 +127,3 @@ Le `compose.yaml` racine de l'Edge Agent reste inchangé.
 Voir [architecture et contrats](ARCHITECTURE.md), [questions ouvertes](OPEN_QUESTIONS.md)
 et [audit préalable](AUDIT.md). Le rapport de validation donne les résultats
 réellement observés, y compris les limites et les essais initiaux échoués.
-
