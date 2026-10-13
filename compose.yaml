@@ -1,21 +1,5 @@
 services:
 
-  mqtt:
-    image: eclipse-mosquitto:2
-
-    profiles:
-      - local
-
-    ports:
-      - "127.0.0.1:1883:1883"
-
-    volumes:
-      - ./deploy/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-
-    networks:
-      - control
-
-
   edge-agent:
     build:
       context: .
@@ -25,7 +9,7 @@ services:
       EDGE_ID: ${EDGE_ID:-edge-dev-01}
       EDGE_ZONE: ${EDGE_ZONE:-dev}
 
-      MQTT_BROKER: ${MQTT_BROKER:-tcp://mqtt:1883}
+      MQTT_BROKER: ${MQTT_BROKER:-}
 
       HEARTBEAT_INTERVAL: ${HEARTBEAT_INTERVAL:-5s}
 

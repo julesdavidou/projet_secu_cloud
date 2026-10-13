@@ -66,7 +66,7 @@ func loadConfig() Config {
 
 		MQTTBroker: getEnv(
 			"MQTT_BROKER",
-			"tcp://mqtt:1883",
+			"",
 		),
 
 		StorageRoot: getEnv(
@@ -116,35 +116,41 @@ func main() {
 
 	defer stop()
 
-	mqttClient := mqttclient.New(
-		config.MQTTBroker,
-		config.EdgeID,
-	)
+	var mqttClient *mqttclient.Client
 
-	go func() {
-		for {
-			err := mqttClient.Connect()
+	if config.MQTTBroker != "" {
+		mqttClient = mqttclient.New(
+			config.MQTTBroker,
+			config.EdgeID,
+		)
 
-			if err == nil {
-				return
+		go func() {
+			for {
+				err := mqttClient.Connect()
+
+				if err == nil {
+					return
+				}
+
+				log.Printf(
+					"MQTT connection failed: %v",
+					err,
+				)
+
+				select {
+
+				case <-ctx.Done():
+					return
+
+				case <-time.After(
+					2 * time.Second,
+				):
+				}
 			}
-
-			log.Printf(
-				"MQTT connection failed: %v",
-				err,
-			)
-
-			select {
-
-			case <-ctx.Done():
-				return
-
-			case <-time.After(
-				2 * time.Second,
-			):
-			}
-		}
-	}()
+		}()
+	} else {
+		log.Println("MQTT_BROKER not configured: MQTT disabled")
+	}
 
 	getStatus := func() (any, error) {
 		return monitor.Collect(
@@ -406,7 +412,7 @@ func main() {
 
 			case <-ticker.C:
 
-				if !mqttClient.IsConnected() {
+				if mqttClient == nil || !mqttClient.IsConnected() {
 					continue
 				}
 
@@ -458,5 +464,7 @@ func main() {
 		shutdownContext,
 	)
 
-	mqttClient.Disconnect()
+	if mqttClient != nil {
+		mqttClient.Disconnect()
+	}
 }

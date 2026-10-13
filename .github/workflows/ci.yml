@@ -97,7 +97,7 @@ jobs:
 
 
   integration:
-    name: Docker Compose integration
+    name: Docker Compose integration without MQTT
 
     runs-on: ubuntu-latest
 
@@ -112,11 +112,11 @@ jobs:
 
 
       - name: Validate Compose
-        run: docker compose --profile local config --quiet
+        run: docker compose config --quiet
 
 
       - name: Start services
-        run: docker compose --profile local up -d --build
+        run: docker compose up -d --build
 
 
       - name: Wait for Edge Agent
@@ -146,4 +146,4 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: docker compose --profile local down -v
+        run: docker compose down -v
