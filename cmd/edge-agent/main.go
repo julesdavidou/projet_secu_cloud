@@ -20,6 +20,8 @@ type Config struct {
 	EdgeID            string
 	Zone              string
 	MQTTBroker        string
+	MQTTUsername      string
+	MQTTPassword      string
 	StorageRoot       string
 	HeartbeatInterval time.Duration
 }
@@ -66,6 +68,16 @@ func loadConfig() Config {
 
 		MQTTBroker: getEnv(
 			"MQTT_BROKER",
+			"",
+		),
+
+		MQTTUsername: getEnv(
+			"MQTT_USERNAME",
+			"",
+		),
+
+		MQTTPassword: getEnv(
+			"MQTT_PASSWORD",
 			"",
 		),
 
@@ -122,6 +134,8 @@ func main() {
 		mqttClient = mqttclient.New(
 			config.MQTTBroker,
 			config.EdgeID,
+			config.MQTTUsername,
+			config.MQTTPassword,
 		)
 
 		go func() {

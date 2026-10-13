@@ -19,12 +19,16 @@ type Client struct {
 func New(
 	broker string,
 	edgeID string,
+	username string,
+	password string,
 ) *Client {
 
 	options := mqtt.NewClientOptions()
 
 	options.AddBroker(broker)
 	options.SetClientID(edgeID)
+	options.SetUsername(username)
+	options.SetPassword(password)
 
 	options.SetAutoReconnect(true)
 	options.SetConnectRetry(true)

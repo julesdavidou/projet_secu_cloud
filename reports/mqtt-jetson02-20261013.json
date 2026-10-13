@@ -1,0 +1,61 @@
+{
+  "broker": "192.168.1.1:1883",
+  "edge_id": "jetson02",
+  "test_id": "0c858af9774b44188a95122f008c1aac",
+  "started_at": "2026-10-13T16:10:17.364590Z",
+  "checks": [
+    {
+      "name": "HTTP health and monitoring",
+      "result": "PASS",
+      "details": {
+        "health": {
+          "edge_id": "jetson02",
+          "status": "ok"
+        },
+        "architecture": "arm64"
+      }
+    },
+    {
+      "name": "Container stopped cleanly",
+      "result": "PASS",
+      "details": {
+        "status": "exited",
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "MQTT connection without credentials",
+      "result": "FAIL",
+      "details": "Broker rejected connection: CONNACK code 5 (not authorised)"
+    },
+    {
+      "name": "Online state publication",
+      "result": "BLOCKED",
+      "details": "MQTT authentication parameters are required"
+    },
+    {
+      "name": "Successive heartbeat reception",
+      "result": "BLOCKED",
+      "details": "MQTT authentication parameters are required"
+    },
+    {
+      "name": "Command reception",
+      "result": "BLOCKED",
+      "details": "MQTT authentication parameters are required"
+    },
+    {
+      "name": "Automatic reconnection and resubscription",
+      "result": "BLOCKED",
+      "details": "MQTT authentication parameters are required"
+    }
+  ],
+  "error": "Command '['mosquitto_sub', '-h', '192.168.1.1', '-p', '1883', '-V', 'mqttv311', '-t', 'edge/jetson02/status', '-C', '1']' timed out after 20 seconds",
+  "finished_at": "2026-10-13T16:10:50.008035Z",
+  "diagnostics": {
+    "tcp_reachable": true,
+    "mqtt_connack_hex": "20020005",
+    "mqtt_connack_return_code": 5,
+    "mqtt_error": "Connection Refused: not authorised",
+    "mosquitto_pub_exit_code": 5
+  }
+}

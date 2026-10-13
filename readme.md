@@ -53,6 +53,8 @@ Renseigner `MQTT_BROKER` dans `.env` avec l'adresse du broker existant, accessib
 MQTT_BROKER=tcp://ADRESSE_DU_BROKER:1883
 ```
 
+Si le broker exige une authentification, renseigner aussi `MQTT_USERNAME` et `MQTT_PASSWORD` dans `.env` (fichier ignore par Git et exclu de la construction Docker).
+
 Si `MQTT_BROKER` est vide, MQTT est desactive. L'API HTTP, le monitoring et le stockage restent disponibles. Apres modification de `.env`, appliquer la configuration avec `docker compose up -d`.
 
 L'API est accessible sur `http://127.0.0.1:8080` depuis la machine qui execute Docker :
