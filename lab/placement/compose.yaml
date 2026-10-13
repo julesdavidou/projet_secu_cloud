@@ -1,0 +1,143 @@
+name: cariboutv-placement
+x-process: &process
+  build:
+    context: ../..
+    dockerfile: lab/placement/Dockerfile
+    target: runtime
+  profiles: [placement]
+  environment: &environment
+    MQTT_BROKER: mqtt://broker:1883
+    LAB_PASSWORD: ${LAB_PASSWORD:?Copy lab/placement/.env.example to .env}
+  networks: [simulation]
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    profiles: [placement]
+    environment:
+      LAB_PASSWORD: ${LAB_PASSWORD:?Copy lab/placement/.env.example to .env}
+    entrypoint: [/bin/sh, -ec]
+    command:
+      - |
+        for id in central zone-A zone-B edge-A1 edge-A2 edge-B1 edge-B2 scenario; do
+          mosquitto_passwd -b /tmp/placement-passwd "$$id" "$$LAB_PASSWORD" 2>/dev/null || mosquitto_passwd -c -b /tmp/placement-passwd "$$id" "$$LAB_PASSWORD"
+        done
+        chmod 644 /tmp/placement-passwd
+        exec mosquitto -c /mosquitto/config/lab.conf
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/lab.conf:ro
+      - ./acl:/mosquitto/config/acl:ro
+    networks: [simulation]
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'mosquitto_pub -h localhost -V mqttv5 -u scenario -P "$$LAB_PASSWORD" -t lab/placement/v1/presence/scenario -m ready -q 1']
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  central:
+    <<: *process
+    command: [central]
+    environment:
+      <<: *environment
+      DB_PATH: /data/central.db
+    volumes: [central-data:/data]
+    depends_on:
+      broker: {condition: service_healthy}
+
+  zone-a:
+    <<: *process
+    build:
+      context: ../..
+      dockerfile: lab/placement/Dockerfile
+      target: zone
+    environment:
+      <<: *environment
+      PLACEMENT_ENABLED: '1'
+      APP_PORT: '8000'
+      ZONE_ID: A
+      NEIGHBORS: B
+    volumes: [zone-a-data:/data]
+    depends_on:
+      central: {condition: service_healthy}
+
+  zone-b:
+    <<: *process
+    build:
+      context: ../..
+      dockerfile: lab/placement/Dockerfile
+      target: zone
+    environment:
+      <<: *environment
+      PLACEMENT_ENABLED: '1'
+      APP_PORT: '8000'
+      ZONE_ID: B
+      NEIGHBORS: A
+    volumes: [zone-b-data:/data]
+    depends_on:
+      central: {condition: service_healthy}
+
+  a1:
+    <<: *process
+    command: [mock]
+    environment:
+      <<: *environment
+      NODE_ID: A1
+      ZONE_ID: A
+      PROJECT_CAPACITY_BYTES: '1000'
+    depends_on:
+      zone-a: {condition: service_healthy}
+  a2:
+    <<: *process
+    command: [mock]
+    environment:
+      <<: *environment
+      NODE_ID: A2
+      ZONE_ID: A
+      PROJECT_CAPACITY_BYTES: '1000'
+    depends_on:
+      zone-a: {condition: service_healthy}
+  b1:
+    <<: *process
+    command: [mock]
+    environment:
+      <<: *environment
+      NODE_ID: B1
+      ZONE_ID: B
+      PROJECT_CAPACITY_BYTES: '1000'
+    depends_on:
+      zone-b: {condition: service_healthy}
+  b2:
+    <<: *process
+    command: [mock]
+    environment:
+      <<: *environment
+      NODE_ID: B2
+      ZONE_ID: B
+      PROJECT_CAPACITY_BYTES: '1000'
+    depends_on:
+      zone-b: {condition: service_healthy}
+
+  scenario:
+    <<: *process
+    command: [scenario]
+    restart: 'no'
+    healthcheck: {disable: true}
+    depends_on:
+      a1: {condition: service_healthy}
+      a2: {condition: service_healthy}
+      b1: {condition: service_healthy}
+      b2: {condition: service_healthy}
+
+networks:
+  simulation:
+    internal: true
+volumes:
+  central-data:
+  zone-a-data:
+  zone-b-data:

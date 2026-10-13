@@ -2,6 +2,7 @@
 .github
 
 .env
+**/.env
 
 bin
 data

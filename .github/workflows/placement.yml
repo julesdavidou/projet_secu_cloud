@@ -1,0 +1,23 @@
+name: Placement reference lab
+on:
+  push:
+    paths: ['pkg/placement/**', 'lab/placement/**', 'serveur-zone/**', '.github/workflows/placement.yml']
+  pull_request:
+    paths: ['pkg/placement/**', 'lab/placement/**', 'serveur-zone/**', '.github/workflows/placement.yml']
+permissions:
+  contents: read
+jobs:
+  placement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Format, tests, race detector and vet for all three modules
+        run: docker build -f lab/placement/Dockerfile --target verify .
+      - name: Simulated E2E and authoritative catalog restart
+        run: sh lab/placement/verify.sh --fresh
+      - name: Logs
+        if: always()
+        run: docker compose -f lab/placement/compose.yaml --profile placement logs --no-color
+      - name: Cleanup isolated simulation
+        if: always()
+        run: docker compose -f lab/placement/compose.yaml --profile placement down -v

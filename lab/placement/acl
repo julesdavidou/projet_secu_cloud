@@ -1,0 +1,31 @@
+# RPC identity comes from authenticated username, not a JSON field.
+pattern write lab/placement/v1/+/request/%u
+pattern read lab/placement/v1/%u/request/+
+pattern write lab/placement/v1/+/reply/%u
+pattern read lab/placement/v1/%u/reply/+
+pattern write lab/placement/v1/presence/%u
+
+user zone-A
+topic write lab/placement/v1/zone/A/summary
+topic read lab/placement/v1/zone/+/summary
+topic read lab/placement/v1/zone/A/node/+/state
+topic read lab/placement/v1/zone/A/node/+/heartbeat
+
+user zone-B
+topic write lab/placement/v1/zone/B/summary
+topic read lab/placement/v1/zone/+/summary
+topic read lab/placement/v1/zone/B/node/+/state
+topic read lab/placement/v1/zone/B/node/+/heartbeat
+
+user edge-A1
+topic write lab/placement/v1/zone/+/node/A1/state
+topic write lab/placement/v1/zone/+/node/A1/heartbeat
+user edge-A2
+topic write lab/placement/v1/zone/+/node/A2/state
+topic write lab/placement/v1/zone/+/node/A2/heartbeat
+user edge-B1
+topic write lab/placement/v1/zone/+/node/B1/state
+topic write lab/placement/v1/zone/+/node/B1/heartbeat
+user edge-B2
+topic write lab/placement/v1/zone/+/node/B2/state
+topic write lab/placement/v1/zone/+/node/B2/heartbeat

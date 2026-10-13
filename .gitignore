@@ -16,3 +16,5 @@ data/
 # OS
 .DS_Store
 Thumbs.db
+serveur-zone/.env
+lab/placement/.env

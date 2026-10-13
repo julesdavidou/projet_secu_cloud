@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "request_id": "example-request",
+    "video_id": "example-video",
+    "source_node_id": "A1",
+    "total_size_bytes": 670,
+    "segments": [
+      {"segment_id": 0, "size_bytes": 120},
+      {"segment_id": 1, "size_bytes": 250},
+      {"segment_id": 2, "size_bytes": 300}
+    ]
+  },
+  "target_size_bytes": 256
+}

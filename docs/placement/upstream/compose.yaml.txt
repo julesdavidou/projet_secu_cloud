@@ -1,0 +1,13 @@
+name: CaribouTV
+
+services:
+  serveur-zone:
+    build: ./serveur-zone
+    container_name: serveur-zone
+    ports:
+      - "8000:8000"
+    volumes:
+      - serveur-zone-db:/data
+
+volumes:
+  serveur-zone-db:
