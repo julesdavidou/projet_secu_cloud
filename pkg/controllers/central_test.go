@@ -60,12 +60,26 @@ func TestCentralProofIdempotenceRestartAndOwnership(t *testing.T) {
 		t.Fatal(err)
 	}
 	before, _ := c.inspect()
+	before.Uploads["request"].Units[0].Proof = "response-must-not-alias-ledger"
+	owned, _ := c.inspect()
+	if owned.Uploads["request"].Units[0].Proof != "HTTP_SHA256_VERIFIED" {
+		t.Fatal("response shares mutable ledger units")
+	}
 	if err = call("edge-pi", "STORE_COMPLETE", proof); err != nil {
 		t.Fatal(err)
 	}
 	after, _ := c.inspect()
 	if before.Catalog.Events != after.Catalog.Events || after.Uploads["request"].State != "READY" {
 		t.Fatal("duplicate mutation or missing READY")
+	}
+	otherUpload, otherPlan := u, plan
+	otherUpload.Manifest.RequestID = "another-request"
+	otherPlan.RequestID = "another-request"
+	if err = call("zone-west", "PLAN", PlanCommit{otherUpload, otherPlan, time.Now().Add(time.Minute)}); err == nil {
+		t.Fatal("video identity reused by another request")
+	}
+	if len(c.state.Uploads) != 1 {
+		t.Fatal("failed duplicate video shadows original transport metadata")
 	}
 	if err = c.Close(); err != nil {
 		t.Fatal(err)

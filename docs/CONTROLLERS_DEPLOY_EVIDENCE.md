@@ -21,6 +21,7 @@ docker build -f deploy/lab/Dockerfile --target verify -t caribou/controllers-ver
 | Racine : test / race / vet | **PASS / PASS / PASS** |
 | serveur-zone : test / race / vet | **PASS / PASS / PASS**, TestGetNodeScansAllSixColumns inclus |
 | lab/placement : test / race / vet | **PASS / PASS / PASS**, aucun fichier modifié dans ce banc |
+| Isolation des vues Central/STATUS Edge et unicité video_id | **PASS**, réponses sans référence mutable au ledger et requête conflictuelle sans altération de la vidéo existante |
 | gofmt sur fichiers concernés + git diff --check | **PASS** ; les anciens internal/storage/storage*.go ne sont pas reformatés |
 | Dockerfile Edge historique AMD64/ARM64 + Compose racine sans MQTT | **PASS après correctif** : copie des go.mod/go.sum du module local avant go mod download ; aucun changement de la CI legacy |
 | Compose config --quiet / build / up --wait | **PASS**, exit codes vérifiés |
@@ -49,7 +50,7 @@ docker build -f deploy/lab/Dockerfile --target verify -t caribou/controllers-ver
 | Raspberry Pi / Jetson / pare-feu et réseau du laboratoire | **NOT_TESTED**, matériel/IP réels indisponibles ; aucune règle pare-feu installée automatiquement |
 | VOD complète, HLS, live, SIS, RTP/RTX/WebRTC | **SKIPPED**, hors scope demandé |
 
-Dernier smoke real-http enregistré : `s1792346809052`. Deux unités de **614 400 bytes**, vérifiées par `sha256sum` ET `stat -c %s` directement dans des volumes différents puis par GET après redémarrages :
+Dernier smoke real-http enregistré : `s1792348029116`. Deux unités de **614 400 bytes**, vérifiées par `sha256sum` ET `stat -c %s` directement dans des volumes différents puis par GET après redémarrages :
 
 | Destination | SHA-256 | Preuve |
 |---|---|---|
@@ -70,12 +71,12 @@ python deploy/lab/verify-image.py controllers-amd64.tar --expect amd64
 python deploy/lab/verify-image.py controllers-arm64.tar --expect arm64
 ```
 
-Index multiarchitecture : `sha256:18d37f1fc680fcd5701ef2d7549f31dc4c0e55478d38e5a1252f6027e6f851a8`.
+Index multiarchitecture : `sha256:10023d86ab128d8c70dcb2c93ffb56dd4052b4a1a882c53d03a52fb0b8e29f4a`.
 
 | Plateforme | Manifest image | SHA-256 archive docker save |
 |---|---|---|
-| linux/amd64 | ea160044a03dee146c62fa9a321ccc3b437517c0d5075db3715bab2d7b2da2b9 | c2b7e77c3c24666770e3fc0d6a96564721131452a742f1f84cdf807c547b0a06 |
-| linux/arm64 | 4b9d7923272207ea9fa83b580e2842ed9a52afc5da0ffb6209ee3d12f6b238b2 | 83c5956510289f8a495450854a023ca12b1981d29f8a3a38c6a23de47ba67fc1 |
+| linux/amd64 | 60fa14ad8b1cf070e98ff20dfbd1ceffd02416f84a60c5b5c188ae8d36df91d1 | d19f418674b992e66025adc855a153ecb93b4cc3aedb40327d9019f533b1b7b5 |
+| linux/arm64 | 12556382bdcbfe9f7fed0bf73ab9de7af7d679b743f48a5b3322e06e287f9741 | a3ddfad9c19b179e970dd033d2784172ca2538185593d0a689d83f5288c2da1f |
 
 Les archives et journaux locaux sont dans `outputs/controllers-2026-10-18/`, hors dépôt : tests-three-modules.log, build-multiarch.log, smoke-real-http.log, smoke-mock.log, provenance-*.json, image-archives-sha256.json, snapshot-real-http.json, diagnostics.log, external-compose-probe.log, acl-probe.log. Aucune identité réelle n'est dans ces livrables ni les images.
 
@@ -90,3 +91,5 @@ La première CI GitHub a révélé un échec du Dockerfile Edge historique : `/s
 Défauts rencontrés et corrigés : getNode sélectionnait six colonnes pour quatre Scan ; fins de lignes Windows faisaient échouer le script broker (LF imposé) ; enregistrement périodique ne devait pas effacer la liveness fraîche ; preuves MOCK refusées pour un nœud réel ; objet dérivé par hash pour respecter les IDs de stockage ; save/fsync de la chaîne de répertoires ; erreurs de stockage injectées sans confirmation. Un essai de sonde a également demandé de fournir à nouveau les variables Compose lors du nettoyage ; la reprise/arrêt a ensuite réussi. Aucun échec n'a été transformé en PASS sans correction et réexécution correspondante.
 
 La procédure complète « Ce soir depuis Windows » / « Demain au labo », les commandes de préparation ARM et le diagnostic sont dans [deploy/lab/README.md](../deploy/lab/README.md). Contrats MQTT/HTTP effectifs et tableau P0/P1/P2 VOD/live/SIS/RTP : [CONTROLLERS_CONTRACTS.md](CONTROLLERS_CONTRACTS.md). L'absence des IP du laboratoire bloque uniquement la validation **physique distante**, pas le démarrage fonctionnel démontré sur PC.
+
+Les vues Central et STATUS Edge possèdent leurs propres unités/maps afin que leur encodage hors verrou ne partage pas de données mutables. Une seconde request_id ne peut pas réutiliser une video_id et masquer la vidéo déjà cataloguée. Régressions ajoutées, trois modules revérifiés et les deux profils rejoués ; images ci-dessus réexportées après ces correctifs.

@@ -166,6 +166,9 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 			}
 			return c.record(p.Upload.Manifest.RequestID, old)
 		}
+		if _, _, exists := c.findVideo(p.Upload.Manifest.VideoID); exists {
+			return nil, errors.New("video identity already belongs to another request")
+		}
 		u := UploadRecord{Upload: p.Upload, Plan: p.Plan, Expires: p.Expires, State: "RESERVED"}
 		ext, e := placement.Extents(p.Upload.Manifest, p.Upload.Target)
 		if e != nil {
@@ -322,6 +325,9 @@ func (c *Central) findVideo(video string) (string, UploadRecord, bool) {
 	return "", UploadRecord{}, false
 }
 func (c *Central) record(id string, u UploadRecord) (UploadRecord, error) {
+	// Transport encoders run after the handler releases mu. Return owned units
+	// so a concurrent STORE_COMPLETE cannot mutate a response being encoded.
+	u.Units = append([]Unit(nil), u.Units...)
 	l, e := c.db.Lookup(id)
 	if e != nil {
 		return u, e

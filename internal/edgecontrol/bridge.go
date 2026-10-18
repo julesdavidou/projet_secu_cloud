@@ -362,7 +362,11 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			return nil, errors.New("status unauthorized")
 		}
 		n := b.snapshot()
-		return map[string]any{"node": n, "quota_bytes": b.spec.Quota, "mode": b.mode, "units": b.state.Units}, nil
+		units := make(map[string]storedUnit, len(b.state.Units))
+		for k, u := range b.state.Units {
+			units[k] = u
+		}
+		return map[string]any{"node": n, "quota_bytes": b.spec.Quota, "mode": b.mode, "units": units}, nil
 	default:
 		return nil, errors.New("unknown edge bridge operation")
 	}

@@ -1,8 +1,10 @@
 package edgecontrol
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/julesdavidou/projet_secu_cloud/lab/placement/mqttbus"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 	"net/http"
@@ -12,6 +14,18 @@ import (
 	"testing"
 	"time"
 )
+
+func TestStatusResponseDoesNotShareMutableLedger(t *testing.T) {
+	b := &Bridge{spec: controllers.NodeSpec{Quota: 100}, state: ledger{Units: map[string]storedUnit{}}}
+	v, err := b.Handle(context.Background(), "central", mqttbus.Request{Op: "STATUS"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v.(map[string]any)["units"].(map[string]storedUnit)["injected"] = storedUnit{State: "STORED"}
+	if len(b.state.Units) != 0 {
+		t.Fatal("response shares mutable ledger map")
+	}
+}
 
 func TestWriteFailureNeverNotifiesCompletion(t *testing.T) {
 	for _, scenario := range []string{"disk-error", "corrupt-reread", "ledger-error"} {
