@@ -4,6 +4,10 @@ WORKDIR /src
 
 COPY go.mod go.sum ./
 
+# The root module reuses the existing local MQTT5/catalog module. Its module
+# metadata must exist before downloading the dependency graph (sources below).
+COPY lab/placement/go.mod lab/placement/go.sum ./lab/placement/
+
 RUN go mod download
 
 COPY . .
