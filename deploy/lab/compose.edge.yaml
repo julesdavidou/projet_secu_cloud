@@ -1,0 +1,45 @@
+name: caribou-external-edge
+services:
+  edge-bridge:
+    image: ${CONTROLLERS_IMAGE:-caribou/controllers:dev}
+    command: [edge-bridge]
+    restart: unless-stopped
+    init: true
+    cpus: 1.0
+    mem_limit: 256m
+    environment:
+      CONTROLLERS_CONFIG: /config/config.json
+      SECRETS_DIR: /run/lab-secrets
+      EDGE_ID: ${EDGE_ID:?Set provisioned EDGE_ID}
+      EDGE_MODE: real-http
+      EDGE_BACKEND_URL: http://edge-agent:8080
+      MQTT_BROKER: mqtt://${LAB_PC_ADDRESS:?Set real PC LAN IP}:${MQTT_PORT:-1883}
+    ports: ["${EDGE_BIND_IP:?Set Edge LAN IP}:${EDGE_HTTP_PORT:-18081}:8088"]
+    volumes:
+      - ./edge-config/config.json:/config/config.json:ro
+      - ./edge-config/identity:/run/lab-secrets:ro
+      - edge-ledger:/data
+    depends_on:
+      edge-agent: {condition: service_healthy}
+  edge-agent:
+    image: ${CONTROLLERS_IMAGE:-caribou/controllers:dev}
+    command: [edge-agent]
+    restart: unless-stopped
+    init: true
+    cpus: 1.0
+    mem_limit: 256m
+    environment:
+      EDGE_ID: ${EDGE_ID:?Set provisioned EDGE_ID}
+      STORAGE_ROOT: /data
+      HTTP_AUTH_TOKEN_FILE: /run/lab-secrets/edge-${EDGE_ID}.http-token
+    volumes:
+      - ./edge-config/identity:/run/lab-secrets:ro
+      - edge-files:/data
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O - http://127.0.0.1:8080/health']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+volumes:
+  edge-ledger:
+  edge-files:

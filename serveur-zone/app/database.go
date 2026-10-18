@@ -9,6 +9,7 @@ package main
 import (
 	"database/sql"
 	"log"
+	"os"
 
 	_ "modernc.org/sqlite"
 )
@@ -18,7 +19,11 @@ var db *sql.DB
 func initDatabase() {
 	var err error
 
-	db, err = sql.Open("sqlite", "/data/zone.db")
+	path := os.Getenv("ZONE_DB_PATH")
+	if path == "" {
+		path = "/data/zone.db"
+	}
+	db, err = sql.Open("sqlite", path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,6 +31,7 @@ func initDatabase() {
 	if err := db.Ping(); err != nil {
 		log.Fatal(err)
 	}
+	db.SetMaxOpenConns(1)
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS nodes (
