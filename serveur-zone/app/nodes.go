@@ -112,7 +112,7 @@ func getNode(id string) (Node, error) {
 		SELECT id, hostname, ip, status, storage_max, storage_used
 		FROM nodes
 		WHERE id = ?
-	`, id).Scan(&node.ID, &node.Hostname, &node.IP, &node.Status, &node.StorageMax, &node.StorageUsed)
+	`, id).Scan(&node.ID, &node.Hostname, &node.IP, &node.Status)
 
 	return node, err
 }

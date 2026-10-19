@@ -8,9 +8,3 @@ bin
 data
 
 *.log
-
-# Controller deployment secrets and local evidence
-deploy/lab/.runtime/
-deploy/lab/edge-config/
-deploy/lab/smoke-results/
-deploy/lab/config/topology.lab-ready.json

@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/julesdavidou/projet_secu_cloud/lab/placement/service"
-	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 )
 
@@ -61,28 +60,11 @@ func (a *Allocator) request(m placement.Manifest, id string, expires time.Time) 
 // Opt-in MQTT5 reference integration. The process remains serveur-zone; topics
 // are lab/placement/v1 and the Central owns a separate authoritative SQLite DB.
 func initAllocator() {
-	ttl := 5 * time.Second
-	var cfg controllers.Config
-	configPath := os.Getenv("CONTROLLERS_CONFIG")
-	if configPath != "" {
-		var err error
-		cfg, err = controllers.LoadConfig(configPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		ttl = time.Duration(cfg.NodeTTLSeconds) * time.Second
-	}
-	a, err := newAllocator(os.Getenv("ZONE_ID"), 64*1024*1024, ttl)
+	a, err := newAllocator(os.Getenv("ZONE_ID"), 64*1024*1024, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
 	go func() {
-		if configPath != "" {
-			if err := controllers.RunZone(context.Background(), cfg, a.zone, cacheProjectNode); err != nil {
-				log.Fatal("controller startup: ", err)
-			}
-			return
-		}
 		if err := service.ZoneWithRegistry(context.Background(), a.zone); err != nil {
 			log.Fatal("placement adapter startup failed: ", err)
 		}

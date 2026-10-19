@@ -20,8 +20,6 @@ type Config struct {
 	EdgeID            string
 	Zone              string
 	MQTTBroker        string
-	MQTTUsername      string
-	MQTTPassword      string
 	StorageRoot       string
 	HeartbeatInterval time.Duration
 }
@@ -68,16 +66,6 @@ func loadConfig() Config {
 
 		MQTTBroker: getEnv(
 			"MQTT_BROKER",
-			"",
-		),
-
-		MQTTUsername: getEnv(
-			"MQTT_USERNAME",
-			"",
-		),
-
-		MQTTPassword: getEnv(
-			"MQTT_PASSWORD",
 			"",
 		),
 
@@ -134,8 +122,6 @@ func main() {
 		mqttClient = mqttclient.New(
 			config.MQTTBroker,
 			config.EdgeID,
-			config.MQTTUsername,
-			config.MQTTPassword,
 		)
 
 		go func() {
@@ -175,7 +161,6 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	registerVerifiedRoutes(mux, store)
 
 	mux.HandleFunc(
 		"GET /health",
@@ -384,14 +369,10 @@ func main() {
 		},
 	)
 
-	handler, guardErr := storageGuard(mux)
-	if guardErr != nil {
-		log.Fatal("HTTP authentication configuration invalid: ", guardErr)
-	}
 	server := &http.Server{
 		Addr: ":8080",
 
-		Handler: handler,
+		Handler: mux,
 
 		ReadHeaderTimeout: 5 * time.Second,
 
