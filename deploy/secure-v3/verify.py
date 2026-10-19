@@ -105,9 +105,30 @@ with httpx.Client(verify=context('admin'),timeout=90,trust_env=False) as admin:
             original=viewer.get('https://web:8443/api/videos/'+test['video_id']+'/original')
             assert original.status_code==200 and hashlib.sha256(original.content).hexdigest()==test['source_sha256']
         print('PASS private web access and old proof after owner mobility to another authority for '+slot,flush=True)
+    def move(zone):
+        r=admin.post('https://central:8443/api/v1/rpc/edge-A1/MOVE',headers=headers,json={'node_id':'A1','zone_id':zone,'generation':0});r.raise_for_status()
+        for _ in range(30):
+            r=admin.get('https://central:8443/api/v1/snapshot',headers=headers);r.raise_for_status()
+            if r.json()['nodes']['A1']['node']['zone_id']==zone:return
+            time.sleep(.3)
+        raise AssertionError('logical node mobility did not converge')
+    test=fixtures['a']
+    before=[(u['extent_id'],u['node_id'],u['object'],u['sha256']) for u in snapshot['uploads'][test['video_id']]['units']]
+    try:
+        move('B')
+        r=admin.get('https://central:8443/api/v1/videos/'+test['video_id']+'/placements',headers=headers);r.raise_for_status();moved=r.json()
+        assert [(u['extent_id'],u['node_id'],u['object'],u['sha256']) for u in moved['units']]==before
+        assert all(u['zone_id']=='B' for u in moved['units'])
+        with httpx.Client(verify=context('admin'),timeout=90,trust_env=False) as viewer:
+            r=viewer.post('https://web:8443/api/auth/login',data={'email':'secure-owner-a@example.invalid','password':'OnlyForLocalTest!2026'});r.raise_for_status()
+            r=viewer.get('https://web:8443/api/videos/'+test['video_id']+'/original')
+            assert r.status_code==200 and hashlib.sha256(r.content).hexdigest()==test['source_sha256']
+    finally:move('A')
+    print('PASS logical node mobility A to B and back, stable node/object identities and exact reconstruction',flush=True)
     public_keys={}
     for zone in ('a','b'):
         r=admin.get('https://is-'+zone+':8443/v3/authority/info');r.raise_for_status();public_keys[zone]=r.json()
     report={'verified':True,'units':units,'owners':{s:t['owner'] for s,t in fixtures.items()},'public_authorities':public_keys,'node_available':{n:r['node']['available_for_project_bytes'] for n,r in snapshot['nodes'].items()},'physical_lab':'NOT_TESTED'}
-    (ROOT/'verification.json').write_text(json.dumps(report,indent=2))
+    temp=ROOT/('verification-'+secrets.token_hex(8)+'.tmp')
+    temp.write_text(json.dumps(report,indent=2));os.replace(temp,ROOT/'verification.json')
 print('PASS signed VOD, real isolated storage, user access and authority mobility',flush=True)

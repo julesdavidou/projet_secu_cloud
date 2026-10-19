@@ -22,7 +22,8 @@ with httpx.Client(verify=ctx,headers=headers,timeout=60,trust_env=False) as c:
   assert reserved>0,'source capacity too small for this fixture'
   hold='secure-test-'+secrets.token_hex(8)+'-hold'
   # Persist the ID before network submission so a failed invocation is recoverable.
-  path.write_text(json.dumps({'video_id':hold,'bytes':reserved,'stored':False}))
+  temp=path.with_suffix('.'+secrets.token_hex(8)+'.tmp')
+  temp.write_text(json.dumps({'video_id':hold,'bytes':reserved,'stored':False}));os.replace(temp,path)
   upload={'manifest':{'request_id':hold,'video_id':hold,'source_node_id':'A1','total_size_bytes':reserved,'segments':[{'segment_id':0,'size_bytes':reserved}]},'target_size_bytes':1,'contents':[{'extent_id':0,'sha256':'0'*64}]}
   plan=request('/api/v1/uploads',upload);assert plan['state']!='READY' and all(u['node_id']=='A1' for u in plan['units'])
   print('PASS temporary capacity reservation, NO fake stored bytes',flush=True)
