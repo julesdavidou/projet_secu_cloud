@@ -1,5 +1,7 @@
 # Publishes only the dedicated integration branch and opens a draft, never merges.
 $ErrorActionPreference='Stop'
+Push-Location (Resolve-Path "$PSScriptRoot/../..").Path
+try {
 $branch='codex/edge-mqtt-reconstruction-v2'
 $actual=(& git branch --show-current).Trim()
 if($actual -ne $branch){throw "Checkout $branch first"}
@@ -20,3 +22,5 @@ $body=Get-Content "$PSScriptRoot/../../docs/edge-v2/PR-DRAFT.md" -Raw
 $payload=@{title='Integrate Edge MQTT3/5 and real block reconstruction without replacing placement';head=$branch;base='main';draft=$true;body=$body}|ConvertTo-Json
 $pr=Invoke-RestMethod "$api/pulls" -Headers $headers -Method Post -ContentType application/json -Body ([Text.Encoding]::UTF8.GetBytes($payload))
 Write-Output $pr.html_url
+
+} finally {Pop-Location}

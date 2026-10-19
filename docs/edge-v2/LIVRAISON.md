@@ -62,3 +62,5 @@ Le texte de PR est prêt dans [PR-DRAFT.md](PR-DRAFT.md). Une fois l’accès r�
 ```
 
 Cette commande pousse uniquement `codex/edge-mqtt-reconstruction-v2`, réutilise une PR ouverte de cette branche si elle existe, sinon crée une **draft vers main**, et n’effectue aucun merge. La CI ajoutée s’exécute alors sur le SHA publié ; il faut vérifier ses conclusions avant de fusionner. Les limites d’essai sont 512 unités par publication, 64 MiB par asset, blocs de 125000 octets par défaut : utiliser de courtes vidéos de démonstration dans les quotas configurés.
+
+La vérification exigence par exigence est dans [CONFORMITE-SUJET-ARTICLE.md](CONFORMITE-SUJET-ARTICLE.md). La conformité au sujet et à l’article est partielle.
