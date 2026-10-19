@@ -1,0 +1,9 @@
+{
+  "fixture": "synthetic fixed-length bytes; no production data",
+  "default_h3_bits": 32,
+  "candidates_examined": 80103,
+  "different_payloads": true,
+  "different_full_sha256": true,
+  "changed_block_accepted_by_prototype_SIS": true,
+  "current_V2_full_SHA256_check_would_reject": true
+}
