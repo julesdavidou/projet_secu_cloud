@@ -1,5 +1,4 @@
 IMAGE                             ID             DISK USAGE   CONTENT SIZE   EXTRA
-caribou/integration-control:dev   0a2c8ae1ddb8        266MB         95.4MB   U    
-├─ linux/amd64                    60fa14ad8b1c        136MB           49MB   U    
-└─ linux/arm64                    12556382bdcb        130MB         46.4MB   U    
-
+caribou/integration-control:dev   0a2c8ae1ddb8        266MB         95.4MB   U
+├─ linux/amd64                    60fa14ad8b1c        136MB           49MB   U
+└─ linux/arm64                    12556382bdcb        130MB         46.4MB   U
