@@ -2,12 +2,14 @@ package webapp
 
 import (
 	"encoding/json"
+	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 )
@@ -29,7 +31,7 @@ func TestSessionIsolationAndRealOnlyCatalogue(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer "+strings.Repeat("x", 32) {
 			t.Error("operator credential missing")
 		}
-		json.NewEncoder(w).Encode(controllers.Inspection{Uploads: map[string]controllers.UploadRecord{"real": real, "mock": simulated, "private": real}})
+		json.NewEncoder(w).Encode(controllers.Inspection{Uploads: map[string]controllers.UploadRecord{"real": real, "mock": simulated, "private": real}, Nodes: map[string]controllers.Registered{"A1": {Node: placement.Node{ID: "A1", Zone: "A", State: placement.Available, Available: 512, Heartbeat: time.Now()}}, "B1": {Node: placement.Node{ID: "B1", Zone: "B", State: placement.Unavailable, Available: 512, Heartbeat: time.Now()}}}})
 	}))
 	defer control.Close()
 	dir := t.TempDir()
@@ -73,6 +75,13 @@ func TestSessionIsolationAndRealOnlyCatalogue(t *testing.T) {
 	}
 	if w = request("GET", "/assets/js/config.js", "", "", ""); !strings.Contains(w.Body.String(), `dataSource:"api"`) {
 		t.Fatal("frontend not connected")
+	}
+	w = request("GET", "/api/zones", "alice", "", "")
+	var zones struct {
+		Capacity map[string]uint64 `json:"capacity_by_zone"`
+	}
+	if e := json.Unmarshal(w.Body.Bytes(), &zones); e != nil || zones.Capacity["A"] != 512 || zones.Capacity["B"] != 0 {
+		t.Fatalf("unavailable capacity exposed: %s", w.Body.String())
 	}
 	if realReady(controllers.UploadRecord{State: "READY"}) {
 		t.Fatal("empty READY accepted")

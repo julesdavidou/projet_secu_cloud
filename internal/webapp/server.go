@@ -442,7 +442,7 @@ func (s *Server) topology(w http.ResponseWriter, r *http.Request) {
 			state = placement.Unavailable
 		}
 		nodes = append(nodes, map[string]any{"node_id": n.ID, "zone_id": n.Zone, "state": state, "available_for_project_bytes": n.Available, "heartbeat_at": n.Heartbeat})
-		if fresh {
+		if fresh && state != placement.Unavailable {
 			zones[n.Zone] += n.Available
 		}
 	}
