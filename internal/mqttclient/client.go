@@ -20,6 +20,21 @@ type Client struct {
 	storageRoot string
 }
 
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
+}
+
 func New(
 	broker string,
 	nodeID string,
@@ -194,15 +209,4 @@ func (c *Client) Disconnect() {
 	if c.client.IsConnected() {
 		c.client.Disconnect(250)
 	}
-}
-
-// Standalone discovery hint only; managed mode always advertises provisioned endpoints.
-func getLocalIP() string {
-	addrs, _ := net.InterfaceAddrs()
-	for _, a := range addrs {
-		if ip, ok := a.(*net.IPNet); ok && !ip.IP.IsLoopback() && ip.IP.To4() != nil {
-			return ip.IP.String()
-		}
-	}
-	return "127.0.0.1"
 }
