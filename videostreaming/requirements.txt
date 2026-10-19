@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+httpx
+py_ecc==8.0.0
+numpy
+paho-mqtt

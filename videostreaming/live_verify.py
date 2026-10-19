@@ -14,10 +14,8 @@ from pathlib import Path
 
 import httpx
 
-from crypto_serialize import deserialize_g2, deserialize_sigma
-from IBSSignature import IBSSignature
 from sendBlocks import object_name
-from SISIntegrity import SecurityParams, SISIntegrity, SISParams
+from segment_signer import verify_segment
 
 
 def fetch_segment_payloads(node_url: str, owner_id: str, video_id: str, segment_name: str) -> list[bytes]:
@@ -36,39 +34,17 @@ def fetch_segment_payloads(node_url: str, owner_id: str, video_id: str, segment_
         return payloads
 
 
-def verify_segment(state: dict, segment_name: str) -> None:
+def verify_one(state: dict, segment_name: str) -> None:
     node_url = state["placement"].get(segment_name)
     if not node_url:
         raise SystemExit(f"segment {segment_name} absent du placement")
-
-    sec = state["security"]
-    sec_params = SecurityParams(**sec["sec_params"])
-    sis_params = SISParams(**sec["sis_params"])
-    sis = SISIntegrity(sec_params)
-    A = sis.reconstruct_A(sis_params)
-
     print(f"récupération des blocs de {segment_name} depuis {node_url}...")
     payloads = fetch_segment_payloads(node_url, state["owner_id"], state["video_id"], segment_name)
-
-    X_prime = sis.build_data_matrix(payloads)
-    V_prime = sis.compute_V(A, X_prime)
-
-    PK_s = deserialize_g2(sec["PK_s"])
-    sigma = deserialize_sigma(state["segment_signatures"][segment_name]["sigma"])
-
-    ibs = IBSSignature()
-    ok = ibs.verify_signature(sec["owner_id"], None, PK_s, sigma, V_prime, sis_params)
+    ok, bad = verify_segment(state["security"], state["segment_signatures"][segment_name],
+                             state["video_id"], segment_name, payloads)
     print(f"vérification (authenticité + intégrité) : {'OK' if ok else 'ÉCHEC'}")
-
     if not ok:
-        print("diagnostic bloc par bloc :")
-        V = state["segment_signatures"][segment_name]["V"]
-        bad = 0
-        for i, (payload, v_expected) in enumerate(zip(payloads, V)):
-            if not sis.verify_block(payload, A, v_expected):
-                print(f"  bloc {i}: ALTÉRÉ/CORROMPU")
-                bad += 1
-        print(f"{bad} bloc(s) en défaut sur {len(payloads)}")
+        print(f"blocs en défaut : {bad}" if bad else "(V non stocké : pas de localisation bloc par bloc)")
 
 
 def main() -> None:
@@ -83,7 +59,7 @@ def main() -> None:
     if args.segment not in state.get("segment_signatures", {}):
         raise SystemExit(f"pas de signature enregistrée pour {args.segment}")
 
-    verify_segment(state, args.segment)
+    verify_one(state, args.segment)
 
 
 if __name__ == "__main__":
