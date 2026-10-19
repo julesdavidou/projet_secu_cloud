@@ -76,7 +76,7 @@ Routes locales : `POST /owner/operate`, `/owner/delegate`, `/owner/delegated/app
 {"kind":"modify_blocks","edits":[{"index":1,"delete_count":1,"blocks":["BASE64_DU_BLOC"]}]}
 ```
 
-Les index se rapportent à la source avant l’opération ; les éditions sont ordonnées, sans chevauchement. `insert_blocks` impose zéro suppression, `delete_blocks` impose zéro insertion. La dernière taille peut varier. Le propriétaire peut publier une nouvelle version lui-même ou confier ces opérations à un worker via un mandat. Un mandat n’autorise pas les autres vidéos, les autres comptes ou les opérations absentes de sa liste.
+Les index se rapportent à la source avant l’opération ; les éditions sont ordonnées, sans chevauchement. `insert_blocks` impose zéro suppression, `delete_blocks` impose zéro insertion. La dernière taille peut varier. Le propriétaire peut publier une nouvelle version lui-même ou confier ces opérations à un worker via un mandat. Sa durée commence à la signature, avant les calculs et le transfert : un mandat trop court peut expirer avant son installation et sera refusé. Le test d’expiration attend réellement l’échéance d’un mandat de 60 secondes, afin de laisser passer les calculs sur un runner chargé ; le portail conserve son défaut de 5 minutes. Un mandat n’autorise pas les autres vidéos, les autres comptes ou les opérations absentes de sa liste.
 
 `GET /api/videos/:id/operations` fournit la tête autoritaire au propriétaire, y compris après tombstone. Les URL de lecture et le catalogue vérifient l’état Central à chaque accès. Les anciennes URL de médias en cache ne permettent pas de contourner un retrait de partage ou une tombstone. La révocation d’un mandat empêche de nouvelles opérations et conserve la vérifiabilité des signatures déjà admises.
 
