@@ -1,0 +1,30 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { once } from "node:events";
+import { createStaticServer } from "../dev-server.mjs";
+
+test("le serveur statique sert les modules et les plages vidéo sans exposer les fichiers du dépôt", async t => {
+  const server = createStaticServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const index = await fetch(origin);
+  assert.equal(index.status, 200);
+  assert.match(await index.text(), /<html lang="fr">/);
+  assert.match(index.headers.get("content-security-policy"), /script-src 'self'/);
+  const module = await fetch(`${origin}/assets/js/app.js`);
+  assert.match(module.headers.get("content-type"), /javascript/);
+  const media = await fetch(`${origin}/assets/fonts/inter-latin.woff2`, { headers: { Range: "bytes=0-127" } });
+  assert.equal(media.status, 206);
+  assert.equal((await media.arrayBuffer()).byteLength, 128);
+  assert.match(media.headers.get("content-range"), /^bytes 0-127\//);
+  const invalidRange = await fetch(`${origin}/assets/fonts/inter-latin.woff2`, { headers: { Range: "bytes=999999999-" } });
+  assert.equal(invalidRange.status, 416);
+  const secret = await fetch(`${origin}/.env`);
+  assert.equal(secret.status, 400);
+  const outside = await fetch(`${origin}/%2e%2e%5cgo.mod`);
+  assert.equal(outside.status, 400);
+  const post = await fetch(origin, { method: "POST" });
+  assert.equal(post.status, 405);
+});

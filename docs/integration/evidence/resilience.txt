@@ -1,0 +1,97 @@
+ caribou-integration-web-1 Copying caribou-integration-web-1:/data/test-results/. to C:\Users\cyril\Documents\Codex\2026-10-13\je-te-confie-l-impl-mentation\work\repo\deploy\integration/results/
+ caribou-integration-web-1 Copied caribou-integration-web-1:/data/test-results/. to C:\Users\cyril\Documents\Codex\2026-10-13\je-te-confie-l-impl-mentation\work\repo\deploy\integration/results/
+PASS stable Java identity before restart
+PASS central SQLite lookup remains READY
+PASS actual disk SHA256 A1/0
+PASS actual disk SHA256 A1/1
+PASS actual disk SHA256 A1/2
+PASS /api/videos/v-991dd11ef3fb8c50569e0c17d84d92ee/playback rejected HTTP 502
+PASS /media/v-991dd11ef3fb8c50569e0c17d84d92ee/video.mp4 rejected HTTP 409
+PASS fixture restored exactly after corruption test
+ Container caribou-integration-agent-a-1 Restarting
+ Container caribou-integration-auth-1 Restarting
+ Container caribou-integration-zone-a-1 Restarting
+ Container caribou-integration-web-1 Restarting
+ Container caribou-integration-agent-b-1 Restarting
+ Container caribou-integration-edge-b-1 Restarting
+ Container caribou-integration-central-1 Restarting
+ Container caribou-integration-edge-a-1 Restarting
+ Container caribou-integration-zone-b-1 Restarting
+ Container caribou-integration-zone-b-1 Started
+ Container caribou-integration-agent-b-1 Started
+ Container caribou-integration-agent-a-1 Started
+ Container caribou-integration-central-1 Started
+ Container caribou-integration-auth-1 Started
+ Container caribou-integration-edge-b-1 Started
+ Container caribou-integration-web-1 Started
+ Container caribou-integration-edge-a-1 Started
+ Container caribou-integration-zone-a-1 Started
+ Container caribou-integration-web-1 Running
+ Container caribou-integration-zone-a-1 Running
+ Container caribou-integration-auth-1 Running
+ Container caribou-integration-edge-b-1 Running
+ Container caribou-integration-central-1 Running
+ Container caribou-integration-agent-b-1 Running
+ Container caribou-integration-zone-b-1 Running
+ Container caribou-integration-edge-a-1 Running
+ Container caribou-integration-agent-a-1 Running
+ Container caribou-integration-broker-1 Recreate
+ Container caribou-integration-broker-1 Recreated
+ Container caribou-integration-broker-1 Starting
+ Container caribou-integration-broker-1 Started
+ Container caribou-integration-broker-1 Waiting
+ Container caribou-integration-broker-1 Waiting
+ Container caribou-integration-broker-1 Waiting
+ Container caribou-integration-broker-1 Healthy
+ Container caribou-integration-broker-1 Healthy
+ Container caribou-integration-central-1 Waiting
+ Container caribou-integration-central-1 Waiting
+ Container caribou-integration-broker-1 Healthy
+ Container caribou-integration-central-1 Healthy
+ Container caribou-integration-central-1 Healthy
+ Container caribou-integration-zone-a-1 Waiting
+ Container caribou-integration-zone-b-1 Waiting
+ Container caribou-integration-zone-b-1 Waiting
+ Container caribou-integration-zone-a-1 Waiting
+ Container caribou-integration-zone-a-1 Healthy
+ Container caribou-integration-zone-b-1 Healthy
+ Container caribou-integration-zone-b-1 Healthy
+ Container caribou-integration-zone-a-1 Healthy
+ Container caribou-integration-central-1 Waiting
+ Container caribou-integration-auth-1 Waiting
+ Container caribou-integration-edge-a-1 Waiting
+ Container caribou-integration-edge-b-1 Waiting
+ Container caribou-integration-agent-a-1 Waiting
+ Container caribou-integration-agent-b-1 Waiting
+ Container caribou-integration-auth-1 Healthy
+ Container caribou-integration-agent-b-1 Healthy
+ Container caribou-integration-central-1 Healthy
+ Container caribou-integration-agent-a-1 Healthy
+ Container caribou-integration-edge-a-1 Healthy
+ Container caribou-integration-edge-b-1 Healthy
+ Container caribou-integration-auth-1 Waiting
+ Container caribou-integration-agent-a-1 Waiting
+ Container caribou-integration-zone-a-1 Waiting
+ Container caribou-integration-edge-a-1 Waiting
+ Container caribou-integration-agent-b-1 Waiting
+ Container caribou-integration-zone-b-1 Waiting
+ Container caribou-integration-edge-b-1 Waiting
+ Container caribou-integration-central-1 Waiting
+ Container caribou-integration-broker-1 Waiting
+ Container caribou-integration-web-1 Waiting
+ Container caribou-integration-agent-a-1 Healthy
+ Container caribou-integration-agent-b-1 Healthy
+ Container caribou-integration-zone-a-1 Healthy
+ Container caribou-integration-web-1 Healthy
+ Container caribou-integration-auth-1 Healthy
+ Container caribou-integration-edge-a-1 Healthy
+ Container caribou-integration-edge-b-1 Healthy
+ Container caribou-integration-central-1 Healthy
+ Container caribou-integration-zone-b-1 Healthy
+ Container caribou-integration-broker-1 Healthy
+PASS /api/videos rejected HTTP 401
+PASS persisted credentials and stable ID after auth restart
+PASS profile persisted across restart
+PASS catalogue and ownership persisted across restart
+PASS Edge files reread and playback reverified after restart
+PASS real disk corruption refused, bytes restored, durable metadata checked. Physical lab NOT_TESTED.

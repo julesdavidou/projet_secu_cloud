@@ -1,0 +1,2 @@
+PASS source-local plus peer OFFER interzone A/B, PREPARE not READY, idempotent plan
+PASS real bytes uploaded and HTTP reread SHA256 in both zones; durable READY interzone-a01997871fe8416a8eaf9db38fe24593

@@ -1,5 +1,7 @@
 # projet_secu_cloud
 
+> **Branche intégrée CaribouTV (19/10)** : [démarrage et tests PC/laboratoire](deploy/integration/README.md), [audit et branches](docs/integration/AUDIT-2026-10-19.md). Le Compose racine décrit ci-dessous reste le déploiement Edge historique ; le nouveau banc complet se lance avec `deploy/integration/start.ps1`.
+
 Projet de développement d'une architecture **Edge Computing distribuée** pour le stockage et la diffusion sécurisée de données vidéo.
 
 L'objectif est de construire une plateforme capable de déployer plusieurs nœuds Edge sur des machines hétérogènes, notamment :
@@ -53,6 +55,8 @@ Renseigner `MQTT_BROKER` dans `.env` avec l'adresse du broker existant, accessib
 MQTT_BROKER=tcp://ADRESSE_DU_BROKER:1883
 ```
 
+Si le broker exige une authentification, renseigner aussi `MQTT_USERNAME` et `MQTT_PASSWORD` dans `.env` (fichier ignore par Git et exclu de la construction Docker).
+
 Si `MQTT_BROKER` est vide, MQTT est desactive. L'API HTTP, le monitoring et le stockage restent disponibles. Apres modification de `.env`, appliquer la configuration avec `docker compose up -d`.
 
 L'API est accessible sur `http://127.0.0.1:8080` depuis la machine qui execute Docker :
@@ -78,3 +82,16 @@ Pour retirer les conteneurs et le reseau en conservant le volume de stockage :
 ```sh
 docker compose down
 ```
+
+## Interface web CaribouTV
+
+Le frontend responsive est dans `frontend/` (HTML, CSS et JavaScript natifs). Il démarre avec un catalogue vide, sans vidéos ni activité fictives. Aucun backend web n'est ajouté.
+
+Avec Node.js 20 ou plus récent, depuis la racine du dépôt :
+
+```sh
+cd frontend
+npm run dev
+```
+
+Ouvrir http://127.0.0.1:5173/ ; aucune installation de dépendances n'est nécessaire. `npm test` lance les tests du frontend. La procédure complète et le contrat proposé pour la future API web Go sont dans [frontend/README.md](frontend/README.md).

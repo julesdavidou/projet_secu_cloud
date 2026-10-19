@@ -1,0 +1,4 @@
+IMAGE                          ID             DISK USAGE   CONTENT SIZE   EXTRA
+caribou/integration-auth:dev   15f3b7eaddb3        932MB          229MB   U
+├─ linux/amd64                 1549ef8e85a4        456MB          115MB   U
+└─ linux/arm64                 01c24fb5d0c2        476MB          113MB   U

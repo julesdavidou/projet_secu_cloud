@@ -1,0 +1,33 @@
+{
+  "zones": [
+    "A",
+    "B"
+  ],
+  "node_ttl_seconds": 5,
+  "lease_seconds": 300,
+  "fanout": 2,
+  "nodes": [
+    {
+      "id": "A1",
+      "zone": "A",
+      "quota_bytes": 8388608,
+      "endpoint": "http://edge-a:8088",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "mode": "real-http"
+    },
+    {
+      "id": "B1",
+      "zone": "B",
+      "quota_bytes": 8388608,
+      "endpoint": "http://edge-b:8088",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "mode": "real-http"
+    }
+  ]
+}
