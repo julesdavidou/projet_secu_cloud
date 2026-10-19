@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
-	"github.com/julesdavidou/projet_secu_cloud/pkg/protocol"
+	"github.com/julesdavidou/projet_secu_cloud/internal/monitor"
 )
 
 type Client struct {
@@ -15,6 +16,21 @@ type Client struct {
 	nodeID      string
 	zoneID      string
 	storageRoot string
+}
+
+func getLocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, address := range addrs {
+		if ipnet, ok := address.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return "127.0.0.1"
 }
 
 func New(
@@ -41,7 +57,6 @@ func New(
 	stateTopic := fmt.Sprintf("zone/%s/node/%s/state", zoneID, nodeID)
 	commandTopic := fmt.Sprintf("node/%s/command", nodeID)
 
-	// Message Testament (LWT) en cas de crash ou déconnexion
 	offlinePayload, _ := json.Marshal(map[string]interface{}{
 		"op":      "UPDATE",
 		"status":  "OFFLINE",
@@ -59,11 +74,9 @@ func New(
 	options.OnConnect = func(client mqtt.Client) {
 		log.Printf("Connecté au broker MQTT %s (Zone: %s)", broker, zoneID)
 
-		// 1. Déclaration de la zone
 		zoneTopic := fmt.Sprintf("node/%s/zone", nodeID)
 		client.Publish(zoneTopic, 1, true, zoneID)
 
-		// 2. Écoute et traitement des commandes du Serveur de Zone
 		client.Subscribe(commandTopic, 1, func(client mqtt.Client, message mqtt.Message) {
 			log.Printf("Commande MQTT reçue sur %s : %s", message.Topic(), string(message.Payload()))
 
@@ -80,11 +93,9 @@ func New(
 			}
 
 			switch cmd.Op {
-			// Demande du serveur de zone de renvoyer l'état complet
 			case "REQUEST_STATUS", "REFRESH_STATE":
 				_ = result.PublishState(getLocalIP())
 
-			// Demande du serveur de zone d'effacer un fragment stocké
 			case "DELETE_OBJECT":
 				if onDeleteRequested != nil && cmd.Tenant != "" && cmd.Object != "" {
 					err := onDeleteRequested(cmd.Tenant, cmd.Object)
@@ -92,13 +103,11 @@ func New(
 					if err != nil {
 						statusStr = "FAILED"
 					}
-					// Notification de l'événement en retour au serveur de zone
 					_ = result.PublishEvent(cmd.ActionID, "DELETE_RESULT", map[string]interface{}{
 						"tenant": cmd.Tenant,
 						"object": cmd.Object,
 						"status": statusStr,
 					})
-					// Mettre à jour l'espace libéré dans la zone
 					_ = result.PublishState(getLocalIP())
 				}
 			}
@@ -119,9 +128,8 @@ func (c *Client) IsConnected() bool {
 	return c.client.IsConnected()
 }
 
-// PublishState collecte les métriques disque courantes et publie sur zone/{zone_id}/node/{node_id}/state
 func (c *Client) PublishState(localIP string) error {
-	status, err := collectMetrics(c.nodeID, c.zoneID, c.storageRoot)
+	status, err := monitor.Collect(c.nodeID, c.zoneID, c.storageRoot)
 	if err != nil {
 		return err
 	}
@@ -146,7 +154,6 @@ func (c *Client) PublishState(localIP string) error {
 	return token.Error()
 }
 
-// PublishHeartbeat envoie un ping périodique sur zone/{zone_id}/node/{node_id}/heartbeat
 func (c *Client) PublishHeartbeat() error {
 	payload, _ := json.Marshal(map[string]interface{}{
 		"op":        "HEARTBEAT",
@@ -161,7 +168,6 @@ func (c *Client) PublishHeartbeat() error {
 	return token.Error()
 }
 
-// PublishEvent publie un événement sur node/{node_id}/event
 func (c *Client) PublishEvent(eventID string, op string, details map[string]interface{}) error {
 	payloadMap := map[string]interface{}{
 		"event_id": eventID,
