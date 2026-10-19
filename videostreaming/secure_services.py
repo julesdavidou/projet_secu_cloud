@@ -121,6 +121,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
    self.reply(404,{'error':'unknown route'})
   except PermissionError as e:self.reply(403,{'error':str(e)})
   except (ValueError,KeyError,TypeError,OverflowError,json.JSONDecodeError):self.reply(422,{'error':'invalid request or signature'})
+  except httpx.HTTPStatusError as e:
+   # Report the failed contract, never its body, headers, cookie or key shares.
+   self.reply(502,{'error':'upstream operation refused','upstream_status':e.response.status_code,'upstream_path':e.request.url.path})
   except (httpx.HTTPError,subprocess.SubprocessError,OSError):self.reply(502,{'error':'required authority, catalogue or media operation unavailable'})
   except Exception:self.reply(500,{'error':'security operation failed'})
  def owner_post(self,path):
