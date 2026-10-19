@@ -80,3 +80,16 @@ Pour retirer les conteneurs et le reseau en conservant le volume de stockage :
 ```sh
 docker compose down
 ```
+
+## Interface web CaribouTV
+
+Le frontend responsive est dans `frontend/` (HTML, CSS et JavaScript natifs). Il démarre avec un catalogue vide, sans vidéos ni activité fictives. Aucun backend web n'est ajouté.
+
+Avec Node.js 20 ou plus récent, depuis la racine du dépôt :
+
+```sh
+cd frontend
+npm run dev
+```
+
+Ouvrir http://127.0.0.1:5173/ ; aucune installation de dépendances n'est nécessaire. `npm test` lance les tests du frontend. La procédure complète et le contrat proposé pour la future API web Go sont dans [frontend/README.md](frontend/README.md).
