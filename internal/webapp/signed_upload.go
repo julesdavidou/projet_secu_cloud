@@ -116,7 +116,7 @@ func (s *Server) signedUpload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if validateAssets(m, upload) != nil {
+	if validateAssets(m, upload) != nil || validateSignedPlaylist(m) != nil {
 		http.Error(w, "invalid asset mapping", 422)
 		return
 	}

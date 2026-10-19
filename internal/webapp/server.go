@@ -664,6 +664,9 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 	controllers.JSON(w, 200, map[string]any{"url": "/media/" + m.ID + "/video.mp4", "sources": []any{}, "subtitles": []any{}, "integrity": integrity})
 }
 func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.UploadRecord) error {
+	if e := validateSignedPlaylist(m); e != nil {
+		return e
+	}
 	value, _ := s.videoLocks.LoadOrStore(m.ID, &sync.Mutex{})
 	lock := value.(*sync.Mutex)
 	lock.Lock()
