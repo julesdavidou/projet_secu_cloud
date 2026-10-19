@@ -8,9 +8,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/julesdavidou/projet_secu_cloud/internal/transportsecurity"
 	"io"
 	"net/url"
 	"strings"
@@ -44,7 +46,13 @@ type pending struct {
 	target string
 	result chan Response
 }
+type cachedReply struct {
+	digest  [32]byte
+	expires time.Time
+	body    []byte
+}
 type Bus struct {
+	completed    map[string]cachedReply
 	id           string
 	cm           *autopaho.ConnectionManager
 	v3           mqtt3.Client
@@ -115,6 +123,12 @@ func NewWithProtocol(ctx context.Context, broker, id, password string, subscript
 			}()
 		},
 		ClientConfig: paho.ClientConfig{ClientID: id, PacketTimeout: 3 * time.Second, OnPublishReceived: []func(paho.PublishReceived) (bool, error){func(pr paho.PublishReceived) (bool, error) { b.receive(ctx, pr.Packet); return true, nil }}},
+	}
+	if u.Scheme == "tls" {
+		cfg.TlsCfg, err = transportsecurity.Client()
+		if err != nil {
+			return nil, err
+		}
 	}
 	b.cm, err = autopaho.NewConnection(ctx, cfg)
 	if err != nil {
@@ -192,6 +206,36 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 		default:
 			return
 		}
+		requestKey := sender + "/" + hex.EncodeToString(p.Properties.CorrelationData)
+		fingerprint := sha256.Sum256(p.Payload)
+		b.mu.Lock()
+		if b.completed == nil {
+			b.completed = map[string]cachedReply{}
+		}
+		now := time.Now()
+		for key, entry := range b.completed {
+			if !now.Before(entry.expires) {
+				delete(b.completed, key)
+			}
+		}
+		cached, duplicate := b.completed[requestKey]
+		replay := append([]byte(nil), cached.body...)
+		full := len(b.completed) >= 4096
+		if !duplicate && !full {
+			b.completed[requestKey] = cachedReply{digest: fingerprint, expires: req.Expires}
+		}
+		b.mu.Unlock()
+		if duplicate || full {
+			<-b.slots
+			if duplicate && cached.digest == fingerprint && len(replay) > 0 {
+				go func() {
+					op, cancel := context.WithDeadline(ctx, req.Expires)
+					defer cancel()
+					_, _ = b.publishPacket(op, &paho.Publish{Topic: p.Properties.ResponseTopic, QoS: 1, Payload: replay, Properties: &paho.PublishProperties{CorrelationData: p.Properties.CorrelationData}})
+				}()
+			}
+			return
+		}
 		go func() {
 			defer func() { <-b.slots }()
 			op, cancel := context.WithDeadline(ctx, req.Expires)
@@ -207,6 +251,9 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 				response.Body, _ = json.Marshal(value)
 			}
 			raw, _ := json.Marshal(response)
+			b.mu.Lock()
+			b.completed[requestKey] = cachedReply{digest: fingerprint, expires: req.Expires, body: raw}
+			b.mu.Unlock()
 			_, _ = b.publishPacket(op, &paho.Publish{Topic: p.Properties.ResponseTopic, QoS: 1, Payload: raw, Properties: &paho.PublishProperties{CorrelationData: p.Properties.CorrelationData}})
 		}()
 		return

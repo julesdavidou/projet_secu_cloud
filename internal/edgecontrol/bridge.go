@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -359,6 +360,14 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			}
 		}
 		return map[string]string{"proof": "MOCK"}, b.announce(ctx, true)
+	case "PEER_PING":
+		if !strings.HasPrefix(sender, "edge-") {
+			return nil, errors.New("peer identity required")
+		}
+		if _, ok := b.cfg.Node(strings.TrimPrefix(sender, "edge-")); !ok {
+			return nil, errors.New("unknown peer")
+		}
+		return map[string]string{"node_id": b.spec.ID, "peer": sender, "transport": "direct MQTT"}, nil
 	case "STATUS", "REQUEST_STATUS", "REFRESH_STATE":
 		if sender != "central" && !controllers.Authorized(b.cfg, sender) {
 			return nil, errors.New("status unauthorized")

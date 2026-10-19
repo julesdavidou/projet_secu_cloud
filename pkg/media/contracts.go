@@ -31,6 +31,9 @@ type Asset struct {
 	Blocks    []Block `json:"blocks"`
 }
 type Job struct {
+	Revision    uint64          `json:"revision,omitempty"`
+	Previous    string          `json:"previous,omitempty"`
+	Public      bool            `json:"public,omitempty"`
 	Version     int             `json:"version"`
 	VideoID     string          `json:"video_id"`
 	OwnerID     string          `json:"owner_id"`

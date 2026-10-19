@@ -38,19 +38,22 @@ type MediaFile struct {
 	ExtentID uint64 `json:"extent_id"`
 }
 type Movie struct {
-	ID            string        `json:"id"`
-	LayoutVersion int           `json:"layout_version,omitempty"`
-	Assets        []media.Asset `json:"assets,omitempty"`
-	NativeSource  bool          `json:"native_source,omitempty"`
-	Owner         string        `json:"owner"`
-	Title         string        `json:"title"`
-	Category      string        `json:"category"`
-	Description   string        `json:"description"`
-	Public        bool          `json:"public"`
-	PublishedAt   string        `json:"publishedAt"`
-	Duration      float64       `json:"duration"`
-	Playlist      string        `json:"playlist"`
-	Files         []MediaFile   `json:"files"`
+	ID            string                     `json:"id"`
+	LayoutVersion int                        `json:"layout_version,omitempty"`
+	Proofs        map[string]json.RawMessage `json:"proofs,omitempty"`
+	Revision      uint64                     `json:"revision,omitempty"`
+	Previous      string                     `json:"previous,omitempty"`
+	Assets        []media.Asset              `json:"assets,omitempty"`
+	NativeSource  bool                       `json:"native_source,omitempty"`
+	Owner         string                     `json:"owner"`
+	Title         string                     `json:"title"`
+	Category      string                     `json:"category"`
+	Description   string                     `json:"description"`
+	Public        bool                       `json:"public"`
+	PublishedAt   string                     `json:"publishedAt"`
+	Duration      float64                    `json:"duration"`
+	Playlist      string                     `json:"playlist"`
+	Files         []MediaFile                `json:"files"`
 }
 type History struct {
 	VideoID   string  `json:"videoId"`
@@ -69,15 +72,21 @@ type metadata struct {
 	Movies   map[string]Movie   `json:"movies"`
 	Profiles map[string]Profile `json:"profiles"`
 }
+type secureCacheEntry struct {
+	Path, ContentHash, ProofHash string
+	Expires                      time.Time
+}
 type Server struct {
-	cfg       Config
-	client    *http.Client
-	token     string
-	mu        sync.Mutex
-	state     metadata
-	mediaMu   sync.Mutex
-	verified  map[string]string
-	authProxy *httputil.ReverseProxy
+	videoLocks  sync.Map
+	secureCache map[string]secureCacheEntry
+	cfg         Config
+	client      *http.Client
+	token       string
+	mu          sync.Mutex
+	state       metadata
+	mediaMu     sync.Mutex
+	verified    map[string]string
+	authProxy   *httputil.ReverseProxy
 }
 type identityKey struct{}
 
@@ -103,7 +112,7 @@ func New(cfg Config) (*Server, error) {
 	if len(strings.TrimSpace(string(raw))) < 24 {
 		return nil, errors.New("operator secret missing")
 	}
-	s := &Server{cfg: cfg, token: strings.TrimSpace(string(raw)), client: &http.Client{Timeout: 90 * time.Second}, state: metadata{Movies: map[string]Movie{}, Profiles: map[string]Profile{}}, verified: map[string]string{}}
+	s := &Server{cfg: cfg, token: strings.TrimSpace(string(raw)), client: &http.Client{Timeout: 90 * time.Second}, state: metadata{Movies: map[string]Movie{}, Profiles: map[string]Profile{}}, verified: map[string]string{}, secureCache: map[string]secureCacheEntry{}}
 	if e = controllers.ReadJSON(filepath.Join(cfg.DataDir, "web-metadata.json"), &s.state); e != nil {
 		return nil, e
 	}
@@ -195,6 +204,7 @@ func (s *Server) Handler() http.Handler {
 	api := http.NewServeMux()
 	api.HandleFunc("GET /api/videos", s.list)
 	api.HandleFunc("POST /api/videos", s.upload)
+	api.HandleFunc("POST /api/videos/signed", s.signedUpload)
 	api.HandleFunc("GET /api/videos/{id}/playback", s.playback)
 	api.HandleFunc("GET /api/videos/{id}/original", s.original)
 	api.HandleFunc("GET /api/videos/{id}/placement", s.placement)
@@ -207,7 +217,12 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/nodes", s.topology)
 	api.HandleFunc("GET /api/zones", s.topology)
 	api.HandleFunc("GET /api/capabilities", func(w http.ResponseWriter, r *http.Request) {
-		controllers.JSON(w, 200, map[string]string{"auth": "Java opaque session", "placement": "Go HRW", "storage": "real-http", "vod": "colleague HLS segmentation, verified MP4 remux", "integrity": "SHA256; SIS/IBS prototype not integrated", "live": "prototype not integrated", "brokers": "one authenticated broker"})
+		integrity, brokers := "SHA256; legacy SIS/IBS prototype not integrated", "authenticated broker"
+		if controllers.Env("REQUIRE_SIS_IBS", "0") == "1" {
+			integrity = "SIS-HESS-BLS12381-v3 + SHA256; local owner signatures required"
+			brokers = "mutual TLS, stable node identities, direct broker links"
+		}
+		controllers.JSON(w, 200, map[string]string{"auth": "Java opaque session", "placement": "Go HRW", "storage": "real-http", "vod": "HLS or native MP4, verified Edge reconstruction", "integrity": integrity, "live": "prototype not integrated", "brokers": brokers})
 	})
 	mux.Handle("/api/", s.protected(api))
 	mux.Handle("GET /media/{id}/video.mp4", s.protected(http.HandlerFunc(s.media)))
@@ -478,6 +493,10 @@ func (s *Server) edge(ctx context.Context, u controllers.Unit, method string, bo
 type videoKey struct{}
 
 func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
+	if controllers.Env("REQUIRE_SIS_IBS", "0") == "1" {
+		http.Error(w, "use the local owner companion to sign this publication", 428)
+		return
+	}
 	title := strings.TrimSpace(r.URL.Query().Get("title"))
 	if len(title) == 0 || len(title) > 120 {
 		http.Error(w, "title required (1-120 characters)", 400)
@@ -638,12 +657,23 @@ func (s *Server) playback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "media missing or integrity check failed", 502)
 		return
 	}
-	controllers.JSON(w, 200, map[string]any{"url": "/media/" + m.ID + "/video.mp4", "sources": []any{}, "subtitles": []any{}, "integrity": "SHA256 verified from Edges; SIS/IBS not integrated"})
+	integrity := "SHA256 verified from Edges; legacy prototype SIS/IBS not active"
+	if m.LayoutVersion == 3 {
+		integrity = "SIS-HESS-BLS12381-v3 signed assets verified on Edge"
+	}
+	controllers.JSON(w, 200, map[string]any{"url": "/media/" + m.ID + "/video.mp4", "sources": []any{}, "subtitles": []any{}, "integrity": integrity})
 }
 func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.UploadRecord) error {
+	value, _ := s.videoLocks.LoadOrStore(m.ID, &sync.Mutex{})
+	lock := value.(*sync.Mutex)
+	lock.Lock()
+	defer lock.Unlock()
+	if m.LayoutVersion == 3 && s.secureCacheHit(m) {
+		return nil
+	}
 	s.mediaMu.Lock()
-	defer s.mediaMu.Unlock()
 	delete(s.verified, m.ID)
+	s.mediaMu.Unlock()
 	dir, e := os.MkdirTemp(filepath.Join(s.cfg.DataDir, "tmp"), "read-")
 	if e != nil {
 		return e
@@ -653,7 +683,7 @@ func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.Upl
 	if len(v.Units) != len(m.Files) {
 		return errors.New("incomplete media mapping")
 	}
-	if m.LayoutVersion == 2 {
+	if m.LayoutVersion >= 2 {
 		for _, asset := range m.Assets {
 			if m.NativeSource && asset.Name != "original.mp4" || !m.NativeSource && asset.Name == "original.mp4" {
 				continue
@@ -667,7 +697,12 @@ func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.Upl
 			if e = os.Rename(filepath.Join(dir, "original.mp4"), final); e != nil {
 				return e
 			}
+			s.mediaMu.Lock()
 			s.verified[m.ID] = final
+			s.mediaMu.Unlock()
+			if m.LayoutVersion == 3 {
+				s.rememberSecure(m, final)
+			}
 			return nil
 		}
 	} else {
@@ -713,7 +748,12 @@ func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.Upl
 	if e = os.Rename(filepath.Join(dir, "playback.mp4"), final); e != nil {
 		return e
 	}
+	s.mediaMu.Lock()
 	s.verified[m.ID] = final
+	s.mediaMu.Unlock()
+	if m.LayoutVersion == 3 {
+		s.rememberSecure(m, final)
+	}
 	return nil
 }
 func (s *Server) media(w http.ResponseWriter, r *http.Request) {

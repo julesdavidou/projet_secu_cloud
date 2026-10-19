@@ -12,12 +12,17 @@ type Content struct {
 	SHA256   string `json:"sha256"`
 }
 type Upload struct {
-	Manifest placement.Manifest `json:"manifest"`
-	Target   uint64             `json:"target_size_bytes"`
-	Contents []Content          `json:"contents"`
+	OwnerID        string             `json:"owner_id,omitempty"`
+	ManifestSHA256 string             `json:"manifest_sha256,omitempty"`
+	Manifest       placement.Manifest `json:"manifest"`
+	Target         uint64             `json:"target_size_bytes"`
+	Contents       []Content          `json:"contents"`
 }
 
 func (u Upload) Validate() error {
+	if (u.OwnerID != "" || u.ManifestSHA256 != "") && (!placement.ValidID(u.OwnerID) || !ValidHash(u.ManifestSHA256)) {
+		return errors.New("invalid signed owner or manifest digest")
+	}
 	ext, e := placement.Extents(u.Manifest, u.Target)
 	if e != nil {
 		return e

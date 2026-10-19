@@ -14,6 +14,7 @@ func main() {
 	mode := flag.String("mode", "real-http", "real-http or mock")
 	edgeBrokers := flag.Bool("edge-brokers", false, "provision per-Edge broker routes")
 	hub := flag.String("hub", "broker:1883", "reachable MQTT hub host:port")
+	secure := flag.Bool("secure-v3", false, "provision transport PKI for secure profile")
 	flag.Parse()
 	raw, e := os.ReadFile(*path)
 	if e != nil {
@@ -31,6 +32,11 @@ func main() {
 	}
 	if *edgeBrokers {
 		if e = controllers.ProvisionEdgeBrokers(cfg, *out, *hub); e != nil {
+			log.Fatal(e)
+		}
+	}
+	if *secure {
+		if e = controllers.ProvisionPKI(cfg, *out); e != nil {
 			log.Fatal(e)
 		}
 	}

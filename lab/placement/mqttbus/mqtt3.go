@@ -6,6 +6,7 @@ import (
 	"github.com/eclipse/paho.golang/paho"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/julesdavidou/projet_secu_cloud/internal/mqttclient/transport"
+	"github.com/julesdavidou/projet_secu_cloud/internal/transportsecurity"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 	"net/url"
 	"strings"
@@ -29,6 +30,13 @@ func newV3(ctx context.Context, broker, id, password string, subscriptions []str
 		topics[topic] = 1
 	}
 	options := transport.Options(u.String(), id, id, password)
+	if u.Scheme == "tls" {
+		cfg, e := transportsecurity.Client()
+		if e != nil {
+			return nil, e
+		}
+		options.SetTLSConfig(cfg)
+	}
 	options.SetWill(Root+"presence/"+id, `{"state":"UNAVAILABLE"}`, 1, true)
 	options.OnConnect = func(c mqtt.Client) {
 		go func() {

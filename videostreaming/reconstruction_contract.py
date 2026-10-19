@@ -40,7 +40,7 @@ def signed_context(job):
                        for b in sorted(asset["blocks"], key=lambda b: b["index"])]}
 
 def validate_job(job, allowed):
-    if job.get("version") != 2:
+    if job.get("version") not in {2,3}:
         raise ValueError("unsupported block contract")
     for key in ["video_id", "owner_id"]:
         if not re.fullmatch(r"[A-Za-z0-9_.-]{1,160}", job[key]):
@@ -64,14 +64,18 @@ def validate_job(job, allowed):
         digest(b["sha256"])
         endpoint=b["endpoint"]
         u=urlsplit(endpoint)
-        if endpoint not in allowed or u.scheme!="http" or not u.hostname or u.username or u.path or u.query or u.fragment:raise ValueError("unprovisioned endpoint")
+        if endpoint not in allowed or u.scheme not in {"http","https"} or not u.hostname or u.username or u.path or u.query or u.fragment:raise ValueError("unprovisioned endpoint")
         if not isinstance(b.get("read_capability"),str) or not 1<=len(b["read_capability"])<=2048:raise ValueError("missing read capability")
     return asset
 
 async def reconstruct_bytes(job,allowed,client=None):
     asset=validate_job(job,allowed)
     owned=client is None
-    if owned:client=httpx.AsyncClient(timeout=30,follow_redirects=False,trust_env=False)
+    if owned:
+        if job.get("version")==3:
+            from secure_services import ssl_client
+            client=httpx.AsyncClient(timeout=30,follow_redirects=False,trust_env=False,verify=ssl_client())
+        else:client=httpx.AsyncClient(timeout=30,follow_redirects=False,trust_env=False)
     limit=asyncio.Semaphore(4)
     try:
         async def one(b):
@@ -93,6 +97,16 @@ async def reconstruct_bytes(job,allowed,client=None):
         if owned:await client.aclose()
     raw=reassemble_segment(blocks)
     if hashlib.sha256(raw).hexdigest()!=asset["sha256"]:raise ValueError("asset SHA256 mismatch")
+    if job.get("version")==3:
+        from secure_sis import verify_asset,SUITE
+        from secure_services import trusted_keys
+        proof=job.get("security")
+        if not proof or proof.get("suite")!=SUITE:raise ValueError("required SIS/IBS proof missing")
+        keys=await asyncio.to_thread(trusted_keys,proof["zones"])
+        payloads=[pad_block(b.payload,asset["block_size"]) for b in sorted(blocks,key=lambda b:b.block_index)]
+        ok=await asyncio.to_thread(verify_asset,proof,job["owner_id"],job["video_id"],asset,payloads,keys,job.get("revision",1),job.get("previous",""),job.get("public",False))
+        if not ok:raise ValueError("SIS/IBS verification failed")
+        return raw
     sec,entry,anchor=job.get("security"),job.get("signature"),job.get("trust_anchor")
     if sec or entry or anchor:
         if not sec or not entry or not anchor or sec.get("owner_id")!=job["owner_id"] or sec.get("owner_id")!=anchor.get("owner_id") or sec.get("PK_s")!=anchor.get("PK_s"):

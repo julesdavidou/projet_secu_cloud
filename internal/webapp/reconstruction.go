@@ -58,6 +58,16 @@ func (s *Server) fetchAsset(ctx context.Context, m Movie, v controllers.UploadRe
 		units[u.ID] = u
 	}
 	job := media.Job{Version: 2, VideoID: m.ID, OwnerID: m.Owner, Asset: a}
+	if m.LayoutVersion == 3 {
+		job.Version = 3
+		job.Security = m.Proofs[a.Name]
+		job.Revision = m.Revision
+		job.Previous = m.Previous
+		job.Public = m.Public
+		if len(job.Security) == 0 {
+			return errors.New("missing required SIS/IBS proof")
+		}
+	}
 	job.Asset.Blocks = append([]media.Block(nil), a.Blocks...)
 	for i, block := range job.Asset.Blocks {
 		u, ok := units[block.ExtentID]
@@ -117,7 +127,7 @@ func (s *Server) original(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if m.LayoutVersion != 2 {
+	if m.LayoutVersion < 2 {
 		http.Error(w, "source not retained for legacy videos", 409)
 		return
 	}

@@ -33,7 +33,7 @@ func (b *Bridge) reconstruct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var job media.Job
-	if controllers.ReadBody(w, r, &job) != nil || job.Version != 2 || len(job.Asset.Blocks) == 0 || len(job.Asset.Blocks) > 512 || job.Asset.Size > 64<<20 {
+	if controllers.ReadBody(w, r, &job) != nil || (job.Version != 2 && job.Version != 3) || len(job.Asset.Blocks) == 0 || len(job.Asset.Blocks) > 512 || job.Asset.Size > 64<<20 {
 		http.Error(w, "invalid reconstruction contract", 400)
 		return
 	}
@@ -50,7 +50,11 @@ func (b *Bridge) reconstruct(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid reconstruction job", 400)
 		return
 	}
-	q, e := http.NewRequestWithContext(r.Context(), "POST", endpoint+"/v2/reconstruct", bytes.NewReader(raw))
+	route := "/v2/reconstruct"
+	if job.Version == 3 {
+		route = "/v3/reconstruct"
+	}
+	q, e := http.NewRequestWithContext(r.Context(), "POST", endpoint+route, bytes.NewReader(raw))
 	if e != nil {
 		http.Error(w, "invalid worker configuration", 503)
 		return

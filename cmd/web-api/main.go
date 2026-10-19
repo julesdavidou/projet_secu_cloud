@@ -17,7 +17,7 @@ func main() {
 	if e != nil {
 		log.Fatal(e)
 	}
-	server := http.Server{Addr: ":8080", Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 180 * time.Second, WriteTimeout: 180 * time.Second, IdleTimeout: 30 * time.Second}
+	server := http.Server{Addr: controllers.Env("WEB_HTTP_ADDR", ":8080"), Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 180 * time.Second, WriteTimeout: 180 * time.Second, IdleTimeout: 30 * time.Second}
 	log.Print("CaribouTV integration HTTP :8080")
 	log.Fatal(server.ListenAndServe())
 }

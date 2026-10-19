@@ -33,3 +33,7 @@ web-api.exe
 # Independent Edge MQTT/reconstruction integration secrets and results
 deploy/edge-v2/.runtime/
 deploy/edge-v2/results/
+
+# Secure V3 identities, transport keys and local test data
+deploy/secure-v3/.runtime/
+deploy/secure-v3/results/

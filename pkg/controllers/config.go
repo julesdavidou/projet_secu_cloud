@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/julesdavidou/projet_secu_cloud/internal/transportsecurity"
 	"io"
 	"net/http"
 	"net/url"
@@ -39,6 +40,9 @@ type Config struct {
 }
 
 func LoadConfig(path string) (Config, error) {
+	if e := transportsecurity.ConfigureHTTP(); e != nil {
+		return Config{}, e
+	}
 	var c Config
 	raw, e := os.ReadFile(path)
 	if e != nil {
@@ -68,7 +72,7 @@ func (c Config) Validate() error {
 		}
 		seen[actor] = true
 		u, e := url.Parse(n.Endpoint)
-		if e != nil || u.Scheme != "http" || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
 			return errors.New("node endpoint must be an explicit http origin")
 		}
 		zones := map[string]bool{}
