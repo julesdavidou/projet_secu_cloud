@@ -55,6 +55,15 @@ if os.environ.get('PEER_ONLY')=='1':raise SystemExit(0)
 fixtures={s:json.loads((ROOT/f'owner-{s}.json').read_text()) for s in ('a','b')}
 headers={'Authorization':'Bearer '+Path('/operator/operator.token').read_text().strip()}
 with httpx.Client(verify=context('admin'),timeout=90,trust_env=False) as admin:
+    operations=ROOT/'operations.json'
+    if operations.exists():
+        op=json.loads(operations.read_text())
+        r=admin.get('https://central:8443/api/v1/videos/'+op['root_id']+'/operations',headers=headers);r.raise_for_status()
+        assert r.json()==op['final_state'],'operation head changed after restart'
+        if op.get('revoked_grant_id'):
+            r=admin.get('https://central:8443/api/v1/delegations/'+op['revoked_grant_id'],headers=headers);r.raise_for_status();assert r.json()['revoked'],'revocation lost after restart'
+        print('PASS SQLite signed head, tombstone and revocation persist across restart',flush=True)
+
     r=admin.get('https://central:8443/api/v1/snapshot',headers=headers);r.raise_for_status();snapshot=r.json()
     units=[]
     for slot,test in fixtures.items():

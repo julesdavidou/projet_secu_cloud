@@ -1,0 +1,36 @@
+{
+  "multicast": "actual Docker bridge UDP5353",
+  "tls_admission": "PASS",
+  "wrong_identity": "REFUSED",
+  "unknown_device": "REFUSED",
+  "public_ip": "REFUSED",
+  "edge_cannot_admit_itself": "PASS",
+  "routes": {
+    "broker-a1:8883": {
+      "address": "172.24.0.2:8883",
+      "expires_at": "2026-10-19T19:26:56.949921889Z"
+    },
+    "broker-b1:8883": {
+      "address": "172.24.0.4:8883",
+      "expires_at": "2026-10-19T19:26:56.989966808Z"
+    },
+    "edge-a:8443": {
+      "address": "172.24.0.15:8443",
+      "expires_at": "2026-10-19T19:26:56.949921889Z"
+    },
+    "edge-b:8443": {
+      "address": "172.24.0.16:8443",
+      "expires_at": "2026-10-19T19:26:56.989966808Z"
+    },
+    "reconstructor-a1:8443": {
+      "address": "172.24.0.8:8443",
+      "expires_at": "2026-10-19T19:26:56.949921889Z"
+    },
+    "reconstructor-b1:8443": {
+      "address": "172.24.0.11:8443",
+      "expires_at": "2026-10-19T19:26:56.989966808Z"
+    }
+  },
+  "physical_lan": "NOT_TESTED",
+  "windows_multicast_nat": "native helper required"
+}

@@ -1,5 +1,7 @@
 # Banc V3 : signatures locales et stockage utilisateur isolé
 
+Les ajouts réseau/QoS/opérations et le déploiement laboratoire sont décrits dans [RESEAU-QOS-OPERATIONS.md](RESEAU-QOS-OPERATIONS.md).
+
 Ce profil est séparé des bancs `caribou-integration`, `caribou-controllers` et `caribou-edge-v2`. Il réutilise Auth Java, le scheduler Go et l’allocator du Zone Controller, Central SQLite, les vrais Edge Go et le découpage/reconstructeur Python du collègue. Le placement n’est pas réimplémenté. Aucun merge de PR n’est nécessaire pour tester cette branche.
 
 ## Décision explicitement validée

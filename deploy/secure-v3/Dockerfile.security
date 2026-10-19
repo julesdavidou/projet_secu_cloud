@@ -10,6 +10,7 @@ WORKDIR /app/vendor-video
 COPY videostreaming/requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt ffmpeg-python==0.2.0
 COPY videostreaming/ /app/vendor-video/
+COPY deploy/secure-v3/lan.py deploy/secure-v3/broker_contract.py /app/
 COPY integrations/video/ /app/video/
 RUN useradd -u 10001 -M worker && mkdir /data && chown 10001:10001 /data
 COPY --from=certbuild /storage-certificate /usr/local/bin/storage-certificate

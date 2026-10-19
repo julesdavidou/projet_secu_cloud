@@ -38,11 +38,14 @@ type MediaFile struct {
 	ExtentID uint64 `json:"extent_id"`
 }
 type Movie struct {
+	RootID        string                     `json:"root_id,omitempty"`
+	OperationKind string                     `json:"operation_kind,omitempty"`
 	ID            string                     `json:"id"`
 	LayoutVersion int                        `json:"layout_version,omitempty"`
 	Proofs        map[string]json.RawMessage `json:"proofs,omitempty"`
 	Revision      uint64                     `json:"revision,omitempty"`
 	Previous      string                     `json:"previous,omitempty"`
+	PackageHash   string                     `json:"package_hash,omitempty"`
 	Assets        []media.Asset              `json:"assets,omitempty"`
 	NativeSource  bool                       `json:"native_source,omitempty"`
 	Owner         string                     `json:"owner"`
@@ -89,6 +92,10 @@ type Server struct {
 	authProxy   *httputil.ReverseProxy
 }
 type identityKey struct{}
+
+type controlFailure struct{ Status int }
+
+func (e *controlFailure) Error() string { return fmt.Sprintf("control plane status %d", e.Status) }
 
 func New(cfg Config) (*Server, error) {
 	if cfg.NodeTTL <= 0 {
@@ -205,9 +212,12 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/videos", s.list)
 	api.HandleFunc("POST /api/videos", s.upload)
 	api.HandleFunc("POST /api/videos/signed", s.signedUpload)
+	api.HandleFunc("POST /api/videos/signed/quote", s.signedUpload)
 	api.HandleFunc("GET /api/videos/{id}/playback", s.playback)
 	api.HandleFunc("GET /api/videos/{id}/original", s.original)
 	api.HandleFunc("GET /api/videos/{id}/placement", s.placement)
+	api.HandleFunc("GET /api/videos/{id}/operations", s.ownerOperationState)
+	api.HandleFunc("POST /api/videos/{id}/operations", s.submitOperation)
 	api.HandleFunc("GET /api/me", s.profile)
 	api.HandleFunc("PATCH /api/me", s.profile)
 	api.HandleFunc("PUT /api/me/favorites/{id}", s.favorite)
@@ -224,6 +234,7 @@ func (s *Server) Handler() http.Handler {
 		}
 		controllers.JSON(w, 200, map[string]string{"auth": "Java opaque session", "placement": "Go HRW", "storage": "real-http", "vod": "HLS or native MP4, verified Edge reconstruction", "integrity": integrity, "live": "prototype not integrated", "brokers": brokers})
 	})
+	s.delegatedAPI(mux)
 	mux.Handle("/api/", s.protected(api))
 	mux.Handle("GET /media/{id}/video.mp4", s.protected(http.HandlerFunc(s.media)))
 	mux.HandleFunc("GET /assets/js/config.js", func(w http.ResponseWriter, r *http.Request) {
@@ -270,7 +281,7 @@ func (s *Server) control(ctx context.Context, method, path string, body any, out
 	defer res.Body.Close()
 	if res.StatusCode >= 300 {
 		io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
-		return fmt.Errorf("control plane status %d", res.StatusCode)
+		return &controlFailure{Status: res.StatusCode}
 	}
 	if out != nil {
 		return json.NewDecoder(io.LimitReader(res.Body, 8<<20)).Decode(out)
@@ -279,9 +290,38 @@ func (s *Server) control(ctx context.Context, method, path string, body any, out
 }
 func (s *Server) movie(id, client string) (Movie, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	m, ok := s.state.Movies[id]
-	return m, ok && (m.Owner == client || m.Public)
+	s.mu.Unlock()
+	if !ok {
+		return m, false
+	}
+	if m.LayoutVersion != 3 {
+		return m, m.Owner == client || m.Public
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	state, e := s.operationState(ctx, m)
+	if e != nil {
+		return m, false
+	}
+	if state == nil {
+		return m, m.Owner == client || m.RootID == "" && m.Public
+	}
+	if state.OwnerID != m.Owner || state.Deleted {
+		return m, false
+	}
+	if id == state.RootID && state.CurrentID != id {
+		s.mu.Lock()
+		m, ok = s.state.Movies[state.CurrentID]
+		s.mu.Unlock()
+		if !ok || m.Owner != state.OwnerID {
+			return m, false
+		}
+	}
+	if id != state.RootID && id != state.CurrentID {
+		return m, m.Owner == client
+	}
+	return m, m.Owner == client || state.Public
 }
 func (s *Server) record(ctx context.Context, id string) (controllers.UploadRecord, error) {
 	var record controllers.UploadRecord
@@ -307,17 +347,22 @@ func (s *Server) list(w http.ResponseWriter, r *http.Request) {
 	}
 	items := []map[string]any{}
 	s.mu.Lock()
-	for _, m := range s.state.Movies {
-		if m.Owner != uid(r) && !m.Public {
+	ids := make([]string, 0, len(s.state.Movies))
+	for id := range s.state.Movies {
+		ids = append(ids, id)
+	}
+	s.mu.Unlock()
+	for _, id := range ids {
+		m, ok := s.movie(id, uid(r))
+		if !ok || m.RootID != "" && id != m.RootID {
 			continue
 		}
 		v, ok := snap.Uploads[m.ID]
 		if !ok || !realReady(v) {
 			continue
 		}
-		items = append(items, map[string]any{"id": m.ID, "title": m.Title, "category": m.Category, "minutes": m.Duration / 60, "publishedAt": m.PublishedAt, "views": 0, "description": m.Description, "tags": []string{}, "image": "/assets/images/favicon.svg", "campus": "", "creator": m.Owner, "contributors": []string{}})
+		items = append(items, map[string]any{"id": id, "title": m.Title, "category": m.Category, "minutes": m.Duration / 60, "publishedAt": m.PublishedAt, "views": 0, "description": m.Description, "tags": []string{}, "image": "/assets/images/favicon.svg", "campus": "", "creator": m.Owner, "contributors": []string{}})
 	}
-	s.mu.Unlock()
 	sort.Slice(items, func(i, j int) bool { return items[i]["publishedAt"].(string) > items[j]["publishedAt"].(string) })
 	controllers.JSON(w, 200, map[string]any{"items": items})
 }
@@ -432,11 +477,12 @@ func (s *Server) clearHistory(w http.ResponseWriter, r *http.Request) {
 	controllers.JSON(w, 200, p)
 }
 func (s *Server) placement(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.movie(r.PathValue("id"), uid(r)); !ok {
+	m, ok := s.movie(r.PathValue("id"), uid(r))
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
-	v, e := s.record(r.Context(), r.PathValue("id"))
+	v, e := s.record(r.Context(), m.ID)
 	if e != nil {
 		http.Error(w, "catalogue unavailable", 503)
 		return
@@ -761,10 +807,12 @@ func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.Upl
 }
 func (s *Server) media(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	if _, ok := s.movie(id, uid(r)); !ok {
+	m, ok := s.movie(id, uid(r))
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
+	id = m.ID
 	v, e := s.record(r.Context(), id)
 	if e != nil || !realReady(v) {
 		http.Error(w, "video not READY", 409)

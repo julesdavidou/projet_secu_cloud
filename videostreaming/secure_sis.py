@@ -3,7 +3,7 @@ with their unsafe hash-to-generator H1 or 32-bit H3 defaults. Not a security pro
 Private owner/zone keys never appear in a public envelope.
 """
 from __future__ import annotations
-import base64,hashlib,json,secrets
+import base64,hashlib,json,secrets,re,time
 from functools import lru_cache
 import numpy as np
 from py_ecc.optimized_bls12_381 import G2,Z1,Z2,add,multiply,neg,pairing,curve_order,eq,is_inf
@@ -109,20 +109,24 @@ def verify_value(owner,public,context,V,params,signature,delegation=None):
   return w1==_challenge(context,V,params,r)
  except (ValueError,TypeError,KeyError,AssertionError,OverflowError):return False
 
-def context_for(owner,video,asset,revision=1,previous='',public=False):
- return {'suite':SUITE,'owner_id':owner,'video_id':video,'revision':revision,'previous':previous,'public':bool(public),
+def context_for(owner,video,asset,revision=1,previous='',public=False,root_id='',operation_kind=''):
+ value={'suite':SUITE,'owner_id':owner,'video_id':video,'revision':revision,'previous':previous,'public':bool(public),
  'name':asset['name'],'size_bytes':asset['size_bytes'],'sha256':asset['sha256'],'block_size':asset['block_size'],
  'blocks':[{k:b[k] for k in ['index','size_bytes','sha256']} for b in sorted(asset['blocks'],key=lambda b:b['index'])]}
+ if root_id:value.update(root_id=root_id,operation_kind=operation_kind)
+ return value
 
-def sign_asset(private,owner,video,asset,payloads,zones,revision=1,previous='',public=False):
- params=new_params();V=fingerprint(payloads,params);context=context_for(owner,video,asset,revision,previous,public)
- return {'suite':SUITE,'owner_id':owner,'zones':zones,'sec_params':PARAMS.copy(),'sis_params':params,
+def sign_asset(private,owner,video,asset,payloads,zones,revision=1,previous='',public=False,root_id='',operation_kind='',delegation=None):
+ params=new_params();V=fingerprint(payloads,params);context=context_for(owner,video,asset,revision,previous,public,root_id,operation_kind)
+ value={'suite':SUITE,'owner_id':owner,'zones':zones,'sec_params':PARAMS.copy(),'sis_params':params,
  'context':context,'V':V,'signature':sign_value(private,context,V,params)}
+ if delegation:value['delegation']=delegation
+ return value
 
-def verify_asset(envelope,owner,video,asset,payloads,trusted,revision=1,previous='',public=False):
+def verify_asset(envelope,owner,video,asset,payloads,trusted,revision=1,previous='',public=False,root_id='',operation_kind=''):
  try:
   if envelope['suite']!=SUITE or envelope['owner_id']!=owner or envelope['sec_params']!=PARAMS:return False
-  expected=context_for(owner,video,asset,revision,previous,public)
+  expected=context_for(owner,video,asset,revision,previous,public,root_id,operation_kind)
   if envelope['context']!=expected:return False
   zones=envelope['zones']
   if not isinstance(zones,list) or not 1<=len(zones)<=6:return False
@@ -134,7 +138,12 @@ def verify_asset(envelope,owner,video,asset,payloads,trusted,revision=1,previous
    seen.add(key);keys.append(trusted[key])
   V=fingerprint(payloads,envelope['sis_params'])
   if envelope['V']!=V:return False
-  return verify_value(owner,aggregate_public(keys),expected,V,envelope['sis_params'],envelope['signature'])
+  public_key=aggregate_public(keys);delegation=None
+  if envelope.get('delegation'):
+   cert=envelope['delegation'];grant=delegation_info(cert,owner,public_key)
+   if cert['zones']!=zones or grant['video_id']!=root_id or operation_kind not in grant['operations']:return False
+   delegation=cert['operation']
+  return verify_value(owner,public_key,expected,V,envelope['sis_params'],envelope['signature'],delegation)
  except (ValueError,TypeError,KeyError,AssertionError,OverflowError):return False
 
 # Authenticated operations use the SAME identity keys. They do not claim that a
@@ -152,3 +161,38 @@ def delegate(private,mandate):
  public=encode_point(multiply(G2,y),2)
  certificate=sign_operation(private,{'owner_id':mandate['owner_id'],'kind':'delegation','mandate':mandate,'public_key':public,'effective_id':effective})
  return key,certificate
+
+def delegation_info(cert,owner,public):
+ if not verify_operation(cert,owner,public):raise ValueError('invalid delegation certificate')
+ op=cert['operation'];m=op['mandate']
+ required={'owner_id','video_id','delegate_id','operations','not_before','expires','max_revision','max_bytes','max_budget_microcredits','nonce'}
+ if op['kind']!='delegation' or set(m)!=required or m['owner_id']!=owner:raise ValueError('invalid delegation schema')
+ for k in ('video_id','delegate_id','nonce'):
+  if not isinstance(m[k],str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,127}',m[k]):raise ValueError('invalid mandate identity')
+ if not m['delegate_id'].startswith('reconstructor-'):raise ValueError('unprovisioned delegate role')
+ for k in ('not_before','expires','max_revision','max_bytes','max_budget_microcredits'):
+  if type(m[k])is not int or not 0<=m[k]<=2**63-1:raise ValueError('invalid mandate bound')
+ if not 0<m['expires']-m['not_before']<=3600 or not 1<=m['max_bytes']<=16*1024*1024 or not 1<=m['max_revision']<=2**63-1:raise ValueError('invalid mandate scope')
+ allowed={'replace','insert_blocks','delete_blocks','modify_blocks','share','unshare','delete'}
+ if not isinstance(m['operations'],list) or not 1<=len(m['operations'])<=7 or len(set(m['operations']))!=len(m['operations']) or not set(m['operations'])<=allowed:raise ValueError('invalid delegated operations')
+ identity=hashlib.sha256(canonical(m)).hexdigest()
+ if op['effective_id']!='delegate:'+identity:raise ValueError('delegation identity mismatch')
+ decode_point(op['public_key'],2)
+ return {**{k:v for k,v in m.items() if k!='nonce'},'grant_id':identity,'certificate_sha256':hashlib.sha256(canonical(cert)).hexdigest()}
+
+def verify_signed_operation(proof,public):
+ if proof.get('suite')!=SUITE:raise ValueError('operation suite mismatch')
+ owner=proof['operation']['owner_id'];params={'I0':17,'a':23,'C0':7};result={'verified':False,'owner_id':owner}
+ if proof.get('delegation'):
+  cert=proof['delegation'];grant=delegation_info(cert,owner,public)
+  if cert['zones']!=proof['zones']:raise ValueError('delegation authority mismatch')
+  valid=verify_value(owner,public,{'operation':proof['operation']},[],params,proof['signature'],cert['operation'])
+  result.update(delegate_grant_id=grant['grant_id'],certificate_sha256=grant['certificate_sha256'])
+ else:valid=verify_operation(proof,owner,public)
+ if not valid:raise ValueError('IBS operation signature refused')
+ if proof['operation']['kind']=='delegate':
+  if proof.get('delegation'):raise ValueError('redelegation refused')
+  cert=proof['operation']['certificate'];grant=delegation_info(cert,owner,public)
+  if cert['zones']!=proof['zones']:raise ValueError('delegation authority mismatch')
+  result['new_grant']=grant
+ result['verified']=True;return result

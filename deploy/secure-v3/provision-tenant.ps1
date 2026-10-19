@@ -5,18 +5,23 @@
 #>
 param(
     [Parameter(Mandatory)][ValidatePattern('^client-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$')][string]$Owner,
-    [Parameter(Mandatory)][ValidateSet('A1','B1')][string]$Node
+    [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,100}$')][string]$Node,
+ [ValidatePattern('^[a-z0-9][a-z0-9-]{0,62}$')][string]$Project='caribou-secure-v3',
+ [string]$ControlImage='caribou/secure-v3-control:dev',
+ [string]$SecurityImage='caribou/secure-v3-security:dev'
 )
 $ErrorActionPreference='Stop'
 if(-not (Get-Command docker -ErrorAction SilentlyContinue)){$env:PATH="${env:LOCALAPPDATA}/Programs/DockerDesktop/resources/bin;"+$env:PATH}
 function D { $result=& docker @args; if($LASTEXITCODE -ne 0){throw "Docker command failed ($LASTEXITCODE)"}; return $result }
-$project='caribou-secure-v3'
+$deploymentProject=$Project
 $nodeLower=$Node.ToLowerInvariant()
-$identity=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("$project/$Node/$Owner"))).ToLowerInvariant().Substring(0,24)
-$name="$project-$nodeLower-$identity"
+$identity=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes("$deploymentProject/$Node/$Owner"))).ToLowerInvariant().Substring(0,24)
+$name="$deploymentProject-$nodeLower-$identity"
 $volume="$name-data"
 $dns="tenant-$identity.storage-$nodeLower.internal"
 $runtime=Join-Path $PSScriptRoot '.runtime'
+$topology=Get-Content -LiteralPath (Join-Path $runtime 'config.json') -Raw|ConvertFrom-Json
+if(@($topology.nodes|Where-Object {$_.id -eq $Node}).Count -ne 1){throw 'Node is not provisioned in config.json'}
 $directory=Join-Path $runtime "tenant-$Node"
 $leaf=Join-Path $runtime "tenant-cert-$Node-$identity"
 $issuer=Join-Path $runtime "pki/storage-issuer-$Node"
@@ -34,16 +39,16 @@ try {
     $existing=@(D ps -a --filter "name=^/${name}$" --format '{{.ID}}')
     if($existing.Count -gt 0){
         $container=(D inspect $existing[0]|ConvertFrom-Json)[0]
-        if($container.Config.Labels.'caribou.project' -ne $project -or $container.Config.Labels.'caribou.owner' -ne $Owner -or $container.Config.Labels.'caribou.node' -ne $Node -or @($container.Mounts|Where-Object {$_.Type -eq 'volume' -and $_.Name -eq $volume -and $_.Destination -eq '/data'}).Count -ne 1){throw 'Existing container identity/mount mismatch; refusing modification'}
+        if($container.Config.Labels.'caribou.project' -ne $deploymentProject -or $container.Config.Labels.'caribou.owner' -ne $Owner -or $container.Config.Labels.'caribou.node' -ne $Node -or @($container.Mounts|Where-Object {$_.Type -eq 'volume' -and $_.Name -eq $volume -and $_.Destination -eq '/data'}).Count -ne 1){throw 'Existing container identity/mount mismatch; refusing modification'}
         if(-not $registry.ContainsKey($Owner)){throw 'Existing container without registry token; explicit recovery required'}
         if(-not $container.State.Running){D start $name|Out-Null}
     } else {
         $uidValue='1000';if($env:OS -ne 'Windows_NT'){$uidValue=(& id -u).Trim()}
         if(-not (Test-Path -LiteralPath "$leaf/tls.crt") -or -not (Test-Path -LiteralPath "$leaf/tls.key")){
             if((Test-Path -LiteralPath "$leaf/tls.crt") -or (Test-Path -LiteralPath "$leaf/tls.key")){throw 'Partial storage certificate: explicit recovery required'}
-            D run --rm --user "${uidValue}:10001" --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,source=$issuer,target=/run/issuer,readonly" --mount "type=bind,source=$leaf,target=/out" caribou/secure-v3-security:dev storage-certificate -name $dns -out /out|Out-Null
+            D run --rm --user "${uidValue}:10001" --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,source=$issuer,target=/run/issuer,readonly" --mount "type=bind,source=$leaf,target=/out" $SecurityImage storage-certificate -name $dns -out /out|Out-Null
         }
-        $image=(D image inspect caribou/secure-v3-control:dev --format '{{.Id}}').Trim()
+        $image=(D image inspect $ControlImage --format '{{.Id}}').Trim()
         $crt=[Convert]::ToBase64String([IO.File]::ReadAllBytes("$leaf/tls.crt"))
         $key=[Convert]::ToBase64String([IO.File]::ReadAllBytes("$leaf/tls.key"))
         $ca=[Convert]::ToBase64String([IO.File]::ReadAllBytes("$issuer/ca.crt"))
@@ -61,7 +66,7 @@ exec tls-run edge-agent
 '@
         # Docker's named volume inherits /data ownership from the image. No host
         # port, privileged flag, host namespace or engine socket is granted.
-        D run -d --name $name --label "caribou.project=$project" --label "caribou.owner=$Owner" --label "caribou.node=$Node" --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true --memory 128m --cpus 0.5 --pids-limit 64 --restart unless-stopped --network "${project}_default" --network-alias $dns --mount "type=volume,source=$volume,target=/data" --env "STORAGE_TENANT_ID=$Owner" --env 'STORAGE_ROOT=/data/objects' --env "TENANT_STORAGE_TOKEN=$($target.token)" --env 'HTTP_AUTH_TOKEN_FILE=/data/.identity/http-token' --env 'EDGE_CONTROL_ENABLED=0' --env 'MQTT_BROKER=' --env 'STORAGE_HTTP_ADDR=127.0.0.1:8080' --env 'TLS_UPSTREAM=http://127.0.0.1:8080' --env "TLS_ALLOWED_PEERS=edge-$Node" --env 'TLS_CA_FILE=/data/.identity/ca.crt' --env 'TLS_CERT_FILE=/data/.identity/tls.crt' --env 'TLS_KEY_FILE=/data/.identity/tls.key' --env "TENANT_TLS_CERT=$crt" --env "TENANT_TLS_KEY=$key" --env "TENANT_TLS_CA=$ca" --health-cmd 'wget -q -O - http://127.0.0.1:8080/health' --health-interval 2s --health-timeout 2s --health-retries 20 $image sh -c $init|Out-Null
+        D run -d --name $name --label "caribou.project=$deploymentProject" --label "caribou.owner=$Owner" --label "caribou.node=$Node" --user 10001:10001 --cap-drop ALL --security-opt no-new-privileges:true --memory 128m --cpus 0.5 --pids-limit 64 --restart unless-stopped --network "${deploymentProject}_default" --network-alias $dns --mount "type=volume,source=$volume,target=/data" --env "STORAGE_TENANT_ID=$Owner" --env 'STORAGE_ROOT=/data/objects' --env "TENANT_STORAGE_TOKEN=$($target.token)" --env 'HTTP_AUTH_TOKEN_FILE=/data/.identity/http-token' --env 'EDGE_CONTROL_ENABLED=0' --env 'MQTT_BROKER=' --env 'STORAGE_HTTP_ADDR=127.0.0.1:8080' --env 'TLS_UPSTREAM=http://127.0.0.1:8080' --env "TLS_ALLOWED_PEERS=edge-$Node" --env 'TLS_CA_FILE=/data/.identity/ca.crt' --env 'TLS_CERT_FILE=/data/.identity/tls.crt' --env 'TLS_KEY_FILE=/data/.identity/tls.key' --env "TENANT_TLS_CERT=$crt" --env "TENANT_TLS_KEY=$key" --env "TENANT_TLS_CA=$ca" --health-cmd 'wget -q -O - http://127.0.0.1:8080/health' --health-interval 2s --health-timeout 2s --health-retries 20 $image sh -c $init|Out-Null
     }
     $healthy=$false
     for($attempt=0;$attempt -lt 30;$attempt++){
@@ -78,7 +83,7 @@ exec tls-run edge-agent
         # The host account need not belong to GID 10001. This short-lived helper
         # runs as that same UID with the storage group and only this directory.
         $uidValue=(& id -u).Trim()
-        D run --rm --user "${uidValue}:10001" --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,source=$directory,target=/registry" caribou/secure-v3-control:dev sh -c 'chgrp 10001 "/registry/$1" && chmod 640 "/registry/$1"' sh ([IO.Path]::GetFileName($temp))|Out-Null
+        D run --rm --user "${uidValue}:10001" --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,source=$directory,target=/registry" $ControlImage sh -c 'chgrp 10001 "/registry/$1" && chmod 640 "/registry/$1"' sh ([IO.Path]::GetFileName($temp))|Out-Null
     }
     Move-Item -LiteralPath $temp -Destination $registryFile -Force
     Write-Host "READY owner=$Owner node=$Node container=$name volume=$volume (no published port)"

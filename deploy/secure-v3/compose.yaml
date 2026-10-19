@@ -38,7 +38,8 @@
         "./.runtime/broker:/provision:ro",
         "./.runtime/pki/broker-A1:/run/tls:ro",
         "broker-a-data:/mosquitto/data",
-        "./.runtime/pki/edge-A1:/run/bridge-tls:ro"
+        "./.runtime/pki/edge-A1:/run/bridge-tls:ro",
+        "./.runtime/lan-A1:/discovery:ro"
       ],
       "healthcheck": {
         "test": [
@@ -66,7 +67,8 @@
         "./.runtime/broker:/provision:ro",
         "./.runtime/pki/broker-B1:/run/tls:ro",
         "broker-b-data:/mosquitto/data",
-        "./.runtime/pki/edge-B1:/run/bridge-tls:ro"
+        "./.runtime/pki/edge-B1:/run/bridge-tls:ro",
+        "./.runtime/lan-B1:/discovery:ro"
       ],
       "healthcheck": {
         "test": [
@@ -100,7 +102,8 @@
         "HTTP_ADDR": "127.0.0.1:8088",
         "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
         "DB_PATH": "/data/central.db",
-        "TLS_ALLOWED_PEERS": "web,zone-*,admin,edge-*"
+        "TLS_ALLOWED_PEERS": "web,zone-*,admin,edge-*",
+        "SECURITY_OPERATION_VERIFY_URL": "https://is-a:8443"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
@@ -154,7 +157,8 @@
         "APP_PORT": "8080",
         "ZONE_DB_PATH": "/data/zone.db",
         "LEDGER_PATH": "/data/controller-ledger.json",
-        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,admin"
+        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,web,admin,owner-*",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
@@ -175,7 +179,10 @@
         "central": {
           "condition": "service_healthy"
         }
-      }
+      },
+      "ports": [
+        "127.0.0.1:19691:8443"
+      ]
     },
     "zone-b": {
       "image": "caribou/secure-v3-control:dev",
@@ -200,7 +207,8 @@
         "APP_PORT": "8080",
         "ZONE_DB_PATH": "/data/zone.db",
         "LEDGER_PATH": "/data/controller-ledger.json",
-        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,admin"
+        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,web,admin,owner-*",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
@@ -221,7 +229,10 @@
         "central": {
           "condition": "service_healthy"
         }
-      }
+      },
+      "ports": [
+        "127.0.0.1:19692:8443"
+      ]
     },
     "edge-a": {
       "image": "caribou/secure-v3-control:dev",
@@ -251,8 +262,9 @@
         "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
         "STORAGE_ROOT": "/data/files",
         "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-A1.http-token",
-        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin",
-        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json"
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,zone-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
@@ -316,8 +328,9 @@
         "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
         "STORAGE_ROOT": "/data/files",
         "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-B1.http-token",
-        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin",
-        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json"
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,zone-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
@@ -439,11 +452,14 @@
         "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
         "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
         "OWNER_INITIAL_ZONE": "A",
-        "OWNER_BROWSER_ORIGIN": "http://localhost:19591"
+        "OWNER_BROWSER_ORIGIN": "http://localhost:19591",
+        "DELEGATE_WORKERS": "{\"reconstructor-A1\":\"https://reconstructor-A1:8443\",\"reconstructor-B1\":\"https://reconstructor-B1:8443\"}",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/pki/owner-a:/run/tls:ro",
-        "owner-a-data:/data"
+        "owner-a-data:/data",
+        "./.runtime/config.json:/config/config.json:ro"
       ],
       "healthcheck": {
         "test": [
@@ -476,11 +492,14 @@
         "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
         "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
         "OWNER_INITIAL_ZONE": "B",
-        "OWNER_BROWSER_ORIGIN": "http://localhost:19592"
+        "OWNER_BROWSER_ORIGIN": "http://localhost:19592",
+        "DELEGATE_WORKERS": "{\"reconstructor-A1\":\"https://reconstructor-A1:8443\",\"reconstructor-B1\":\"https://reconstructor-B1:8443\"}",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/pki/owner-b:/run/tls:ro",
-        "owner-b-data:/data"
+        "owner-b-data:/data",
+        "./.runtime/config.json:/config/config.json:ro"
       ],
       "healthcheck": {
         "test": [
@@ -511,7 +530,8 @@
         "AUTH_URL": "https://auth:8443",
         "WEB_URL": "https://web:8443",
         "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
-        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443"
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "DELEGATE_ID": "reconstructor-A1"
       },
       "volumes": [
         "./.runtime/pki/reconstructor-A1:/run/tls:ro",
@@ -527,6 +547,13 @@
         "interval": "3s",
         "timeout": "5s",
         "retries": 40
+      },
+      "networks": {
+        "default": {
+          "aliases": [
+            "reconstructor-A1"
+          ]
+        }
       }
     },
     "reconstructor-b": {
@@ -543,7 +570,8 @@
         "AUTH_URL": "https://auth:8443",
         "WEB_URL": "https://web:8443",
         "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
-        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443"
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "DELEGATE_ID": "reconstructor-B1"
       },
       "volumes": [
         "./.runtime/pki/reconstructor-B1:/run/tls:ro",
@@ -559,6 +587,13 @@
         "interval": "3s",
         "timeout": "5s",
         "retries": 40
+      },
+      "networks": {
+        "default": {
+          "aliases": [
+            "reconstructor-B1"
+          ]
+        }
       }
     },
     "auth": {
@@ -571,7 +606,7 @@
         "TLS_CA_FILE": "/run/tls/ca.crt",
         "TLS_CERT_FILE": "/run/tls/tls.crt",
         "TLS_KEY_FILE": "/run/tls/tls.key",
-        "TLS_ALLOWED_PEERS": "web,authority-*,owner-*",
+        "TLS_ALLOWED_PEERS": "web,authority-*,owner-*,reconstructor-*",
         "TLS_UPSTREAM": "http://127.0.0.1:8082"
       },
       "volumes": [
@@ -598,14 +633,15 @@
         "TLS_CERT_FILE": "/run/tls/tls.crt",
         "TLS_KEY_FILE": "/run/tls/tls.key",
         "TLS_UPSTREAM": "http://127.0.0.1:8080",
-        "TLS_ALLOWED_PEERS": "owner-*,admin",
+        "TLS_ALLOWED_PEERS": "owner-*,admin,reconstructor-*",
         "CENTRAL_URL": "https://central:8443",
         "AUTH_URL": "https://auth:8443",
         "UPLOAD_SOURCE_NODE": "A1",
         "WEB_BLOCK_PIPELINE": "1",
         "REQUIRE_SIS_IBS": "1",
         "SECURITY_VERIFY_URL": "https://is-a:8443",
-        "CONTROLLERS_CONFIG": "/config/config.json"
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
       },
       "volumes": [
         "./.runtime/pki/web:/run/tls:ro",

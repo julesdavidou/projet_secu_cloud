@@ -1,7 +1,8 @@
 """Actual Java auth -> local owner -> authority -> Go placement -> Edge SIS/IBS.
 Uses fixed demo owner slots; never replaces an existing wallet or deletes data.
 """
-import hashlib,json,os,struct,subprocess,tempfile,time
+import hashlib,json,os,struct,subprocess,tempfile,time,tarfile,io
+from urllib.parse import urlencode
 from pathlib import Path
 import httpx
 from secure_services import ssl_client
@@ -21,8 +22,28 @@ with httpx.Client(verify=ssl_client(),timeout=240,trust_env=False) as c:
   padding=bytes(range(251))*5000
   with source.open('ab') as f:f.write(struct.pack('>I4s',len(padding)+8,b'free')+padding)
   data=source.read_bytes();expected=hashlib.sha256(data).hexdigest();start=time.perf_counter()
-  r=c.post(OWNER+'/owner/publish?title=VOD-SIS-IBS',content=data,headers={'Content-Type':'video/mp4','X-CSRF-Token':csrf});assert r.status_code==201,(r.status_code,r.text)
-  published=r.json();video=published['id'];assert published['integrity'].startswith('SIS-HESS');publish_time=time.perf_counter()-start
+  policy={'max_rtt_ms':2000,'budget_microcredits':100000,'retention_hours':24}
+  r=c.post(OWNER+'/owner/publish?'+urlencode({'title':'VOD-SIS-IBS','prepare':'true','service_policy':json.dumps(policy)}),content=data,headers={'Content-Type':'video/mp4','X-CSRF-Token':csrf});assert r.status_code==201,(r.status_code,r.text)
+  prepared=r.json();video=prepared['video_id'];assert prepared['capacity_reserved'] is False and prepared['quote']['state']=='PLANNED';assert 0<prepared['quote']['service']['cost_microcredits']<=policy['budget_microcredits']
+  archive=Path('/data/outbox')/(video+'.tar')
+  # Real authenticated quote refusals use the same verified media; there are
+  # no mock probe metrics or successful STORED messages in this test.
+  for refused in ({**policy,'budget_microcredits':0},{**policy,'max_rtt_ms':0},{**policy,'max_microcredits_per_gib_hour':0}):
+   output=io.BytesIO()
+   with tarfile.open(archive) as source_tar,tarfile.open(fileobj=output,mode='w') as target_tar:
+    for entry in source_tar:
+     raw=source_tar.extractfile(entry).read()
+     if entry.name=='signed-manifest.json':
+      value=json.loads(raw);value['service_policy']=refused;raw=json.dumps(value,separators=(',',':')).encode();entry.size=len(raw)
+     target_tar.addfile(entry,io.BytesIO(raw))
+   refusal=c.post(BASE+'/api/videos/signed/quote',content=output.getvalue(),headers={'Content-Type':'application/x-tar'});assert refusal.status_code==409,(refusal.status_code,refusal.text)
+  print('PASS real zone probes, quote without reservation, budget/RTT/price refusals',flush=True)
+  r=c.post(OWNER+'/owner/retry',json={'video_id':video},headers={'X-CSRF-Token':csrf});assert r.status_code==201,(r.status_code,r.text)
+  published=r.json();assert published['id']==video and published['service']['cost_microcredits']==prepared['quote']['service']['cost_microcredits'];assert published['integrity'].startswith('SIS-HESS');publish_time=time.perf_counter()-start
+  before=c.get(BASE+'/api/videos/'+video+'/placement');assert before.status_code==200
+  retry=c.post(OWNER+'/owner/retry',json={'video_id':video},headers={'X-CSRF-Token':csrf});assert retry.status_code==201 and retry.json()['id']==video,(retry.status_code,retry.text)
+  after=c.get(BASE+'/api/videos/'+video+'/placement');assert after.json()==before.json(),'retry changed committed placement'
+  print('PASS durable identical signed publication retry reuses video and committed placement',flush=True)
   print('PASS local owner signs real source/HLS blocks; authorities, Go placement and real Edge storage READY',flush=True)
   r=c.post(BASE+'/api/videos?title=unsigned',content=data,headers={'Content-Type':'video/mp4'});assert r.status_code==428
   start=time.perf_counter();r=c.get(BASE+'/api/videos/'+video+'/playback');assert r.status_code==200,(r.status_code,r.text);playback=r.json();cold=time.perf_counter()-start
@@ -32,5 +53,5 @@ with httpx.Client(verify=ssl_client(),timeout=240,trust_env=False) as c:
   original=c.get(BASE+'/api/videos/'+video+'/original');assert original.status_code==200 and original.content==data,(original.status_code,original.text[:100] if original.status_code!=200 else 'mismatch')
   print('PASS real Edge SIS/IBS reconstruction, byte-identical original, MP4 playback and unsigned-upload refusal',flush=True)
   part=c.get(BASE+playback['url'],headers={'Range':'bytes=0-127'});assert part.status_code==206 and part.content==data[:128]
-  result={'owner':owner,'video_id':video,'source_sha256':expected,'source_size':len(data),'publish_seconds':round(publish_time,3),'cold_playback_seconds':round(cold,3),'warm_playback_seconds':round(warm,3),'integrity':published['integrity'],'physical_lab':'NOT_TESTED'}
+  result={'owner':owner,'video_id':video,'source_sha256':expected,'source_size':len(data),'publish_seconds':round(publish_time,3),'cold_playback_seconds':round(cold,3),'warm_playback_seconds':round(warm,3),'integrity':published['integrity'],'physical_lab':'NOT_TESTED','service':published['service']}
   Path('/data/test-results').mkdir(exist_ok=True);Path('/data/test-results/latest.json').write_text(json.dumps(result,indent=2));print(json.dumps(result,indent=2),flush=True)

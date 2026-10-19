@@ -16,10 +16,15 @@ jobs:
         shell: pwsh
         run: ./deploy/secure-v3/start.ps1
       - name: SIS/IBS tests with real cryptographic library
-        run: docker run --rm --cap-drop ALL --security-opt no-new-privileges:true caribou/secure-v3-security:dev python -m unittest test_secure_sis -v
-      - name: Two real owners, two zones, local signatures and byte-identical playback
+        run: docker run --rm --cap-drop ALL --security-opt no-new-privileges:true caribou/secure-v3-security:dev python -m unittest test_secure_sis test_secure_operations test_publication_retry -v
+      - name: Bridge/export security contract (explicit configuration fixtures)
+        run: docker run --rm --cap-drop ALL --security-opt no-new-privileges:true --mount "type=bind,source=$PWD/deploy/secure-v3,target=/contracts,readonly" --workdir /contracts caribou/secure-v3-security:dev python -m unittest test_lan_contract -v
+      - name: Real multicast, authenticated routes, autonomous mesh and two real owner VODs
         shell: pwsh
-        run: ./deploy/secure-v3/smoke.ps1
+        run: ./deploy/secure-v3/discovery.ps1 -WithVod
+      - name: Real signed/delegated block edits, expiry, revocation and access control
+        shell: pwsh
+        run: ./deploy/secure-v3/operations.ps1
       - name: Actual isolation, corruption, absence, direct peer brokers and persistent restart
         shell: pwsh
         run: ./deploy/secure-v3/resilience.ps1

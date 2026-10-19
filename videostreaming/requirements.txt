@@ -4,3 +4,4 @@ httpx
 py_ecc==8.0.0
 numpy
 paho-mqtt
+zeroconf==0.151.5

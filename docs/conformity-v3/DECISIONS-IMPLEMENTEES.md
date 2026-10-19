@@ -24,11 +24,11 @@ Pour la latence, les reconstructions vérifiées sont mises en cache une minute,
 
 Preuve locale : vidéo `v-eec8eab45ff37cbb38ba967bbd05b9cb`, source 229040 octets, SHA256 `46a18630584a545188667a835fdc1cd35b2ee86bf9735ff24e9481ff549f8612`. Publication 11,393 s, préparation froide 2,188 s, préparation chaude 0,049 s sur PC AMD64 ; fichier et reconstruction réels. Le matériel ARM physique reste non testé.
 
-## Lots suivants en cours
+## Réseau, QoS/prix et opérations — lot suivant implémenté
 
-La découverte/admission sera rattachée aux Zone Controllers ; les liens de brokers seront directs entre pairs connus des zones. Le stockage dispose maintenant d’un volume et d’un conteneur distincts par utilisateur et Edge, créés par une commande d’administration ponctuelle explicitement validée. Aucun service ne reçoit le moteur Docker. Les tests réels couvrent deux utilisateurs sur deux zones, les refus croisés et les redémarrages. Voir `LANCEMENT-ET-ISOLATION.md`. Prix et latence observée filtreront l’admission dans le chemin de placement Go, avec des paramètres visibles ; le calcul de placement ne sera pas redéveloppé. Les garanties commerciales de latence et les paiements réels ne sont pas introduits.
+La découverte DNS-SD est désormais validée par les zones via mTLS, avec des baux renouvelables et des bridges directs. Les filtres QoS/prix et les devis réutilisent le scheduler existant. Les opérations IBS, révisions, délégations bornées et révocations sont raccordées au catalogue SQLite. Les versions sont immuables et conservées ; une tombstone n'est pas une purge disque.
 
-Les opérations signées, leur contrôle de version et la délégation devront être vérifiés avec leur reprise après panne. Ces derniers points ne sont pas déclarés terminés dans ce document avant leurs tests d’intégration.
+Voir **[RESEAU-QOS-OPERATIONS.md](RESEAU-QOS-OPERATIONS.md)** pour les choix détaillés, les commandes et les limites des preuves. Les confirmations de tests/CI doivent toujours être rattachées au SHA livré ; les résultats du premier lot ci-dessous restent historiques.
 
 La PR V2 est désormais https://github.com/julesdavidou/projet_secu_cloud/pull/5 (draft), SHA 0007fcb ; ses cinq workflows sont verts. Ce résultat ne couvre pas encore les modifications V3.
 

@@ -11,18 +11,20 @@ import (
 )
 
 type ReservationRequest struct {
-	RequestID     string    `json:"request_id"`
-	VideoID       string    `json:"video_id"`
-	ReservationID string    `json:"reservation_id"`
-	Extents       []Extent  `json:"extents"`
-	Expires       time.Time `json:"expires_at"`
+	RequestID     string         `json:"request_id"`
+	VideoID       string         `json:"video_id"`
+	ReservationID string         `json:"reservation_id"`
+	Extents       []Extent       `json:"extents"`
+	Expires       time.Time      `json:"expires_at"`
+	Policy        *ServicePolicy `json:"service_policy,omitempty"`
 }
 type Reservation struct {
-	Request     ReservationRequest `json:"request"`
-	Plan        []Assignment       `json:"plan"`
-	Remaining   []Extent           `json:"remaining"`
-	State       string             `json:"state"`
-	Fingerprint [32]byte           `json:"-"`
+	Request      ReservationRequest     `json:"request"`
+	Plan         []Assignment           `json:"plan"`
+	Remaining    []Extent               `json:"remaining"`
+	State        string                 `json:"state"`
+	Observations map[string]Observation `json:"service_observations,omitempty"`
+	Fingerprint  [32]byte               `json:"-"`
 }
 type Summary struct {
 	ZoneID     string    `json:"zone_id"`
@@ -39,6 +41,7 @@ type Zone struct {
 	ID           string
 	TTL          time.Duration
 	nodes        map[string]Node
+	observations map[string]Observation
 	reservations map[string]Reservation
 	generation   uint64
 	sink         func(Checkpoint) error
@@ -101,6 +104,14 @@ func cloneReservation(r Reservation) Reservation {
 	r.Plan = slices.Clone(r.Plan)
 	r.Remaining = slices.Clone(r.Remaining)
 	r.Request.Extents = slices.Clone(r.Request.Extents)
+	r.Request.Policy = clonePolicy(r.Request.Policy)
+	if r.Observations != nil {
+		v := map[string]Observation{}
+		for k, o := range r.Observations {
+			v[k] = o
+		}
+		r.Observations = v
+	}
 	return r
 }
 func (z *Zone) expire(now time.Time) {
@@ -156,6 +167,9 @@ func (z *Zone) effective() []Node {
 	return nodes
 }
 func (z *Zone) valid(r ReservationRequest, now time.Time) error {
+	if e := r.Policy.Validate(); e != nil {
+		return e
+	}
 	if z.failed {
 		return errors.New("reservation persistence failed; admission closed")
 	}
@@ -175,8 +189,24 @@ func (z *Zone) plan(r ReservationRequest, now time.Time) (Reservation, error) {
 	if err := z.valid(r, now); err != nil {
 		return Reservation{}, err
 	}
-	p, left, err := Plan(r.VideoID, r.ReservationID, r.Extents, z.effective(), now, z.TTL)
-	return Reservation{Request: r, Plan: p, Remaining: left, State: "PLANNED"}, err
+	nodes := z.effective()
+	eligible := nodes[:0]
+	observed := map[string]Observation{}
+	for _, n := range nodes {
+		o, ok := z.observations[n.ID]
+		if r.Policy != nil && (!ok || o.Generation != n.Generation || !o.accepts(r.Policy, now)) {
+			continue
+		}
+		eligible = append(eligible, n)
+		if ok {
+			observed[n.ID] = o
+		}
+	}
+	p, left, err := Plan(r.VideoID, r.ReservationID, r.Extents, eligible, now, z.TTL)
+	if r.Policy == nil {
+		observed = nil
+	}
+	return Reservation{Request: r, Plan: p, Remaining: left, State: "PLANNED", Observations: observed}, err
 }
 func (z *Zone) Reserve(r ReservationRequest, now time.Time) (Reservation, error) {
 	z.mu.Lock()

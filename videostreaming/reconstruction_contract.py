@@ -4,6 +4,8 @@ Read capabilities expire and authorize GET on one object only; hashes come from 
 """
 from __future__ import annotations
 import asyncio
+import ipaddress
+from datetime import datetime,timezone
 import hashlib
 import hmac
 import json
@@ -81,7 +83,15 @@ async def reconstruct_bytes(job,allowed,client=None):
         async def one(b):
             async with limit:
                 url=f"{b['endpoint']}/store/{job['video_id']}/{b['extent_id']}"
-                async with client.stream("GET",url,headers={"X-Read-Capability":b["read_capability"]}) as response:
+                headers={"X-Read-Capability":b["read_capability"]};extensions={}
+                route=job.get('dial_routes',{}).get(urlsplit(b['endpoint']).netloc.lower())
+                if job.get('version')==3 and route:
+                    expires=datetime.fromisoformat(route['expires_at'].replace('Z','+00:00'));remaining=(expires-datetime.now(timezone.utc)).total_seconds()
+                    address=urlsplit('https://'+route['address']);ip=ipaddress.ip_address(address.hostname)
+                    if not 0<remaining<=31 or not ip.is_private or ip.version!=4 or not address.port:raise ValueError('invalid discovery route')
+                    original=urlsplit(url);headers['Host']=original.netloc;extensions['sni_hostname']=original.hostname
+                    url=original._replace(netloc=address.netloc).geturl()
+                async with client.stream("GET",url,headers=headers,extensions=extensions) as response:
                     response.raise_for_status()
                     content=bytearray()
                     async for part in response.aiter_bytes():
@@ -104,7 +114,7 @@ async def reconstruct_bytes(job,allowed,client=None):
         if not proof or proof.get("suite")!=SUITE:raise ValueError("required SIS/IBS proof missing")
         keys=await asyncio.to_thread(trusted_keys,proof["zones"])
         payloads=[pad_block(b.payload,asset["block_size"]) for b in sorted(blocks,key=lambda b:b.block_index)]
-        ok=await asyncio.to_thread(verify_asset,proof,job["owner_id"],job["video_id"],asset,payloads,keys,job.get("revision",1),job.get("previous",""),job.get("public",False))
+        ok=await asyncio.to_thread(verify_asset,proof,job["owner_id"],job["video_id"],asset,payloads,keys,job.get("revision",1),job.get("previous",""),job.get("public",False),job.get("root_id",""),job.get("operation_kind",""))
         if not ok:raise ValueError("SIS/IBS verification failed")
         return raw
     sec,entry,anchor=job.get("security"),job.get("signature"),job.get("trust_anchor")

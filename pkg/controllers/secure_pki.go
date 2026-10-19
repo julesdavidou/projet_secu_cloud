@@ -105,8 +105,14 @@ func ProvisionPKI(cfg Config, out string) error {
 	for _, n := range cfg.Nodes {
 		u, _ := url.Parse(n.Endpoint)
 		actors["edge-"+n.ID] = []string{n.ID, "edge-" + n.ID, u.Hostname()}
-		actors["broker-"+n.ID] = []string{"broker-" + n.ID, "broker-" + lower(n.Zone)}
-		actors["reconstructor-"+n.ID] = []string{"reconstructor-" + lower(n.Zone), "reconstructor-" + n.ID}
+		actors["broker-"+n.ID] = []string{"broker-" + n.ID}
+		if n.BrokerName != "" {
+			actors["broker-"+n.ID] = append(actors["broker-"+n.ID], n.BrokerName)
+		}
+		actors["reconstructor-"+n.ID] = []string{"reconstructor-" + n.ID}
+		if n.ReconstructorName != "" {
+			actors["reconstructor-"+n.ID] = append(actors["reconstructor-"+n.ID], n.ReconstructorName)
+		}
 	}
 	for actor, names := range actors {
 		dir := filepath.Join(root, actor)

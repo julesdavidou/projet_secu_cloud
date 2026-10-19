@@ -44,6 +44,7 @@ func ConfigureHTTP() error {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = cfg
 	transport.Proxy = nil
+	transport.DialContext = dialRoute
 	http.DefaultTransport = transport
 	return nil
 }

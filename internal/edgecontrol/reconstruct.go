@@ -3,6 +3,7 @@ package edgecontrol
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/julesdavidou/projet_secu_cloud/internal/transportsecurity"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/media"
 	"io"
@@ -43,6 +44,14 @@ func (b *Bridge) reconstruct(w http.ResponseWriter, r *http.Request) {
 		if !ok || node.Endpoint != block.Endpoint || block.ReadCapability == "" {
 			http.Error(w, "unprovisioned block destination", 400)
 			return
+		}
+	}
+	// Ignore routes submitted by callers; only the authenticated central directory may supply them.
+	job.DialRoutes = nil
+	if b.cfg.DiscoveryEnabled {
+		job.DialRoutes = map[string]media.DialRoute{}
+		for h, v := range transportsecurity.Routes() {
+			job.DialRoutes[h] = media.DialRoute{Address: v.Address, Expires: v.Expires}
 		}
 	}
 	raw, e := json.Marshal(job)

@@ -16,7 +16,10 @@
         "A",
         "B"
       ],
-      "mode": "real-http"
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 1000000,
+      "broker_hostname": "broker-a",
+      "reconstructor_hostname": "reconstructor-a"
     },
     {
       "id": "B1",
@@ -27,7 +30,11 @@
         "A",
         "B"
       ],
-      "mode": "real-http"
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 600000,
+      "broker_hostname": "broker-b",
+      "reconstructor_hostname": "reconstructor-b"
     }
-  ]
+  ],
+  "discovery_enabled": true
 }

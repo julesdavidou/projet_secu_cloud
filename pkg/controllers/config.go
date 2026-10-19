@@ -24,19 +24,23 @@ import (
 )
 
 type NodeSpec struct {
-	ID           string   `json:"id"`
-	Zone         string   `json:"zone"`
-	Quota        uint64   `json:"quota_bytes"`
-	Endpoint     string   `json:"endpoint"`
-	AllowedZones []string `json:"allowed_zones"`
-	Mode         string   `json:"mode"`
+	ID                string   `json:"id"`
+	Zone              string   `json:"zone"`
+	Quota             uint64   `json:"quota_bytes"`
+	Endpoint          string   `json:"endpoint"`
+	AllowedZones      []string `json:"allowed_zones"`
+	Mode              string   `json:"mode"`
+	BrokerName        string   `json:"broker_hostname,omitempty"`
+	ReconstructorName string   `json:"reconstructor_hostname,omitempty"`
+	ServiceRate       uint64   `json:"microcredits_per_gib_hour,omitempty"`
 }
 type Config struct {
-	Zones          []string   `json:"zones"`
-	Nodes          []NodeSpec `json:"nodes"`
-	NodeTTLSeconds int        `json:"node_ttl_seconds"`
-	LeaseSeconds   int        `json:"lease_seconds"`
-	Fanout         int        `json:"fanout"`
+	DiscoveryEnabled bool       `json:"discovery_enabled,omitempty"`
+	Zones            []string   `json:"zones"`
+	Nodes            []NodeSpec `json:"nodes"`
+	NodeTTLSeconds   int        `json:"node_ttl_seconds"`
+	LeaseSeconds     int        `json:"lease_seconds"`
+	Fanout           int        `json:"fanout"`
 }
 
 func LoadConfig(path string) (Config, error) {
@@ -69,6 +73,12 @@ func (c Config) Validate() error {
 		actor := "edge-" + n.ID
 		if !placement.ValidID(actor) || seen[actor] || !c.HasZone(n.Zone) || n.Quota == 0 || n.Quota > 1<<50 || len(n.AllowedZones) == 0 || !Has(n.AllowedZones, n.Zone) || (n.Mode != "real-http" && n.Mode != "mock") {
 			return errors.New("invalid node identity, zone, mode or project quota")
+		}
+		if n.ReconstructorName != "" && !placement.ValidID(n.ReconstructorName) {
+			return errors.New("invalid reconstructor hostname")
+		}
+		if n.BrokerName != "" && !placement.ValidID(n.BrokerName) {
+			return errors.New("invalid broker hostname")
 		}
 		seen[actor] = true
 		u, e := url.Parse(n.Endpoint)

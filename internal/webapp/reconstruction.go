@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -59,6 +60,8 @@ func (s *Server) fetchAsset(ctx context.Context, m Movie, v controllers.UploadRe
 	}
 	job := media.Job{Version: 2, VideoID: m.ID, OwnerID: m.Owner, Asset: a}
 	if m.LayoutVersion == 3 {
+		job.RootID = m.RootID
+		job.OperationKind = m.OperationKind
 		job.Version = 3
 		job.Security = m.Proofs[a.Name]
 		job.Revision = m.Revision
@@ -165,6 +168,7 @@ func (s *Server) original(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "video/mp4")
+	w.Header().Set("X-Block-Size", strconv.FormatUint(asset.BlockSize, 10))
 	w.Header().Set("X-Content-SHA256", asset.SHA256)
 	w.Header().Set("X-Reconstruction-Node", v.Units[0].NodeID)
 	http.ServeContent(w, r, "original.mp4", info.ModTime(), f)

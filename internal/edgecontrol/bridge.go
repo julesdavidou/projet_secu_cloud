@@ -38,20 +38,27 @@ type ledger struct {
 	Version    uint64                `json:"version"`
 	Units      map[string]storedUnit `json:"units"`
 }
+type networkIdentity struct {
+	NodeID     string `json:"node_id"`
+	ZoneID     string `json:"zone_id"`
+	Generation uint64 `json:"generation"`
+}
+
 type Bridge struct {
-	mu      sync.Mutex
-	cfg     controllers.Config
-	spec    controllers.NodeSpec
-	path    string
-	state   ledger
-	b       *mqttbus.Bus
-	status  placement.State
-	pause   bool
-	failed  bool
-	mode    string
-	token   string
-	backend string
-	client  *http.Client
+	discovery atomic.Value
+	mu        sync.Mutex
+	cfg       controllers.Config
+	spec      controllers.NodeSpec
+	path      string
+	state     ledger
+	b         *mqttbus.Bus
+	status    placement.State
+	pause     bool
+	failed    bool
+	mode      string
+	token     string
+	backend   string
+	client    *http.Client
 }
 
 func key(video string, id uint64) string { return video + "/" + strconv.FormatUint(id, 10) }
@@ -84,6 +91,8 @@ func (b *Bridge) save() error {
 	e := controllers.AtomicJSON(b.path, b.state)
 	if e != nil {
 		b.failed = true
+	} else {
+		b.discovery.Store(networkIdentity{NodeID: b.spec.ID, ZoneID: b.state.Zone, Generation: b.state.Generation})
 	}
 	return e
 }
@@ -517,6 +526,9 @@ func Run(ctx context.Context, cfg controllers.Config) error {
 	}
 	b.b = bus
 	close(started)
+	if cfg.DiscoveryEnabled {
+		go controllers.SyncDiscovery(ctx, bus)
+	}
 	var ready atomic.Bool
 	go func() {
 		lastError := ""
@@ -555,6 +567,24 @@ func Run(ctx context.Context, cfg controllers.Config) error {
 	}()
 	mux := http.NewServeMux()
 	controllers.Health(mux, ready.Load)
+	mux.HandleFunc("GET /service/probe", func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("X-Verified-Identity"), "zone-") {
+			http.Error(w, "zone certificate required", 403)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(make([]byte, 64<<10))
+	})
+	mux.HandleFunc("GET /discovery", func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("X-Verified-Identity"), "zone-") {
+			http.Error(w, "zone certificate required", 403)
+			return
+		}
+		// Network identity is a committed immutable snapshot. It must not wait
+		// for the ledger lock held by a central reconnect attempt.
+		controllers.JSON(w, 200, b.discovery.Load())
+	})
 	storage := http.NewServeMux()
 	storage.HandleFunc("PUT /store/{video}/{extent}", b.write)
 	mux.HandleFunc("GET /store/{video}/{extent}", b.readAuthorized)

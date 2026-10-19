@@ -30,17 +30,25 @@ type Asset struct {
 	BlockSize uint64  `json:"block_size"`
 	Blocks    []Block `json:"blocks"`
 }
+type DialRoute struct {
+	Address string    `json:"address"`
+	Expires time.Time `json:"expires_at"`
+}
+
 type Job struct {
-	Revision    uint64          `json:"revision,omitempty"`
-	Previous    string          `json:"previous,omitempty"`
-	Public      bool            `json:"public,omitempty"`
-	Version     int             `json:"version"`
-	VideoID     string          `json:"video_id"`
-	OwnerID     string          `json:"owner_id"`
-	Asset       Asset           `json:"asset"`
-	Security    json.RawMessage `json:"security,omitempty"`
-	Signature   json.RawMessage `json:"signature,omitempty"`
-	TrustAnchor json.RawMessage `json:"trust_anchor,omitempty"`
+	RootID        string               `json:"root_id,omitempty"`
+	OperationKind string               `json:"operation_kind,omitempty"`
+	DialRoutes    map[string]DialRoute `json:"dial_routes,omitempty"`
+	Revision      uint64               `json:"revision,omitempty"`
+	Previous      string               `json:"previous,omitempty"`
+	Public        bool                 `json:"public,omitempty"`
+	Version       int                  `json:"version"`
+	VideoID       string               `json:"video_id"`
+	OwnerID       string               `json:"owner_id"`
+	Asset         Asset                `json:"asset"`
+	Security      json.RawMessage      `json:"security,omitempty"`
+	Signature     json.RawMessage      `json:"signature,omitempty"`
+	TrustAnchor   json.RawMessage      `json:"trust_anchor,omitempty"`
 }
 type readGrant struct {
 	Node    string `json:"node"`
