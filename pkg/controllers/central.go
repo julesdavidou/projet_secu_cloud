@@ -185,7 +185,7 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 			if !ok {
 				return nil, errors.New("unknown target node")
 			}
-			u.Units = append(u.Units, Unit{Assignment: a, SHA256: p.Upload.Contents[i].SHA256, Object: EventID("object", p.Upload.Manifest.VideoID, a.ID) + ".bin", Endpoint: n.Endpoint, State: "RESERVED"})
+			u.Units = append(u.Units, Unit{OwnerID: p.Upload.OwnerID, Assignment: a, SHA256: p.Upload.Contents[i].SHA256, Object: EventID("object", p.Upload.Manifest.VideoID, a.ID) + ".bin", Endpoint: n.Endpoint, State: "RESERVED"})
 		}
 		c.state.Uploads[p.Upload.Manifest.RequestID] = u
 		event := catalog.Event{ID: EventID("plan", p.Upload.Manifest.RequestID), Op: "PLAN", Manifest: p.Upload.Manifest, Plan: p.Plan, Expires: p.Expires}

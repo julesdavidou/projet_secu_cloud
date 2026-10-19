@@ -26,8 +26,16 @@ Preuve locale : vidéo `v-eec8eab45ff37cbb38ba967bbd05b9cb`, source 229040 octet
 
 ## Lots suivants en cours
 
-La découverte/admission sera rattachée aux Zone Controllers ; les liens de brokers seront directs entre pairs connus des zones. Le stockage recevra un volume/conteneur distinct par utilisateur et Edge. Prix et latence observée filtreront l’admission dans le chemin de placement Go, avec des paramètres visibles ; le calcul de placement ne sera pas redéveloppé. Les garanties commerciales de latence et les paiements réels ne sont pas introduits.
+La découverte/admission sera rattachée aux Zone Controllers ; les liens de brokers seront directs entre pairs connus des zones. Le stockage dispose maintenant d’un volume et d’un conteneur distincts par utilisateur et Edge, créés par une commande d’administration ponctuelle explicitement validée. Aucun service ne reçoit le moteur Docker. Les tests réels couvrent deux utilisateurs sur deux zones, les refus croisés et les redémarrages. Voir `LANCEMENT-ET-ISOLATION.md`. Prix et latence observée filtreront l’admission dans le chemin de placement Go, avec des paramètres visibles ; le calcul de placement ne sera pas redéveloppé. Les garanties commerciales de latence et les paiements réels ne sont pas introduits.
 
 Les opérations signées, leur contrôle de version et la délégation devront être vérifiés avec leur reprise après panne. Ces derniers points ne sont pas déclarés terminés dans ce document avant leurs tests d’intégration.
 
 La PR V2 est désormais https://github.com/julesdavidou/projet_secu_cloud/pull/5 (draft), SHA 0007fcb ; ses cinq workflows sont verts. Ce résultat ne couvre pas encore les modifications V3.
+
+## Validation complémentaire du stockage isolé
+
+Deux sources MP4 de 1 484 048 et 1 483 738 octets ont été signées puis réparties réellement entre A1 et B1, avant reconstruction identique. Une réservation temporaire non stockée force la répartition et est annulée dans finally ; elle ne simule aucun fichier STORED. Les quatre conteneurs et quatre volumes sont distincts. Namespace d’un autre utilisateur, jeton d’un autre conteneur et certificat de l’autre Edge sont refusés.
+
+La corruption et l’absence d’un bloc sont refusées, puis le fichier est restauré. Les ACK directs passent avec le hub arrêté après correction des ACL locales des bridges et d’un verrou qui retardait le ping pendant l’enregistrement à Central. Après redémarrage, les quotas, clés des autorités et fichiers sont identiques. Les anciennes signatures restent vérifiables après accumulation d’une part d’une seconde zone.
+
+Le binaire Edge Go ARM64 a démarré et répondu sur /health sous émulation Docker ; ce résultat n’est pas un essai sur matériel physique. La CI V3 ajoutée couvre le parcours réel AMD64 et la construction des quatre images ARM64. Son résultat doit être vérifié sur le SHA publié, séparément des anciennes CI V2.

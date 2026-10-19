@@ -19,7 +19,8 @@ var safeID = regexp.MustCompile(
 )
 
 type Store struct {
-	root string
+	root          string
+	allowedTenant string
 }
 
 func New(root string) (*Store, error) {
@@ -46,7 +47,7 @@ func (s *Store) objectPath(
 	object string,
 ) (string, error) {
 
-	if !validID(tenant) || !validID(object) {
+	if !validID(tenant) || !validID(object) || (s.allowedTenant != "" && tenant != s.allowedTenant) {
 		return "", ErrInvalidID
 	}
 
@@ -155,4 +156,17 @@ func (s *Store) Delete(
 	}
 
 	return err
+}
+
+// NewTenant gives a storage process access to exactly one namespace.
+func NewTenant(root, tenant string) (*Store, error) {
+	if !validID(tenant) {
+		return nil, ErrInvalidID
+	}
+	s, e := New(root)
+	if e != nil {
+		return nil, e
+	}
+	s.allowedTenant = tenant
+	return s, nil
 }

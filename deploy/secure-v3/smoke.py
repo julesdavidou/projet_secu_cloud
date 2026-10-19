@@ -1,19 +1,25 @@
 """Actual Java auth -> local owner -> authority -> Go placement -> Edge SIS/IBS.
 Uses fixed demo owner slots; never replaces an existing wallet or deletes data.
 """
-import hashlib,json,subprocess,tempfile,time
+import hashlib,json,os,struct,subprocess,tempfile,time
 from pathlib import Path
 import httpx
 from secure_services import ssl_client
 BASE='https://web:8443';OWNER='http://127.0.0.1:9300'
-email='secure-owner-a@example.invalid';password='OnlyForLocalTest!2026'
+slot=os.environ.get('SMOKE_OWNER_SLOT','a')
+assert slot in ('a','b')
+email='secure-owner-'+slot+'@example.invalid';password='OnlyForLocalTest!2026'
 with httpx.Client(verify=ssl_client(),timeout=240,trust_env=False) as c:
  r=c.post(OWNER+'/owner/login',json={'email':email,'password':password});assert r.status_code==200,(r.status_code,r.text);local=r.json();csrf=local['csrf'];owner=local['owner_id']
  r=c.post(BASE+'/api/auth/login',data={'email':email,'password':password});assert r.json()['client_id']==owner
  print('PASS Java identity reused by local owner and TLS gateway',flush=True)
  with tempfile.TemporaryDirectory() as d:
   source=Path(d)/'source.mp4'
-  subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc2=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=44100','-t','6','-c:v','libx264','-c:a','aac',str(source)],check=True)
+  subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','testsrc2=size=320x180:rate=24','-f','lavfi','-i','sine=frequency='+('440' if slot=='a' else '880')+':sample_rate=44100','-t','6','-c:v','libx264','-c:a','aac',str(source)],check=True)
+  # Valid MP4 free atom: force variable original blocks across zones regardless
+  # of encoder compression. These are real stored, hashed and reconstructed bytes.
+  padding=bytes(range(251))*5000
+  with source.open('ab') as f:f.write(struct.pack('>I4s',len(padding)+8,b'free')+padding)
   data=source.read_bytes();expected=hashlib.sha256(data).hexdigest();start=time.perf_counter()
   r=c.post(OWNER+'/owner/publish?title=VOD-SIS-IBS',content=data,headers={'Content-Type':'video/mp4','X-CSRF-Token':csrf});assert r.status_code==201,(r.status_code,r.text)
   published=r.json();video=published['id'];assert published['integrity'].startswith('SIS-HESS');publish_time=time.perf_counter()-start

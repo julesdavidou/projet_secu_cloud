@@ -168,6 +168,17 @@ func (b *Bridge) notify(ctx context.Context, k string) error {
 	return b.save()
 }
 func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (any, error) {
+	// Peer liveness reads only immutable provisioned identities. It must not wait
+	// for ledger operations or registration RPCs when Central is unreachable.
+	if r.Op == "PEER_PING" {
+		if !strings.HasPrefix(sender, "edge-") {
+			return nil, errors.New("peer identity required")
+		}
+		if _, ok := b.cfg.Node(strings.TrimPrefix(sender, "edge-")); !ok {
+			return nil, errors.New("unknown peer")
+		}
+		return map[string]string{"node_id": b.spec.ID, "peer": sender, "transport": "direct MQTT"}, nil
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.failed {
@@ -204,7 +215,7 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 		for _, unit := range accepted.Units {
 			k := key(q.VideoID, unit.ID)
 			if old, ok := b.state.Units[k]; ok {
-				if old.Unit.Size != unit.Size || old.Unit.SHA256 != unit.SHA256 || old.Unit.ReservationID != q.ReservationID {
+				if old.Unit.OwnerID != unit.OwnerID || old.Unit.Size != unit.Size || old.Unit.SHA256 != unit.SHA256 || old.Unit.ReservationID != q.ReservationID {
 					return nil, errors.New("unit identity conflict")
 				}
 				if old.State == "EXPIRED" || old.State == "RELEASED" {
@@ -360,14 +371,6 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			}
 		}
 		return map[string]string{"proof": "MOCK"}, b.announce(ctx, true)
-	case "PEER_PING":
-		if !strings.HasPrefix(sender, "edge-") {
-			return nil, errors.New("peer identity required")
-		}
-		if _, ok := b.cfg.Node(strings.TrimPrefix(sender, "edge-")); !ok {
-			return nil, errors.New("unknown peer")
-		}
-		return map[string]string{"node_id": b.spec.ID, "peer": sender, "transport": "direct MQTT"}, nil
 	case "STATUS", "REQUEST_STATUS", "REFRESH_STATE":
 		if sender != "central" && !controllers.Authorized(b.cfg, sender) {
 			return nil, errors.New("status unauthorized")
@@ -395,7 +398,7 @@ func (b *Bridge) backendRequest(ctx context.Context, method, path string, body i
 	return b.client.Do(r)
 }
 func (b *Bridge) verifyBackend(ctx context.Context, u storedUnit) error {
-	r, e := b.backendRequest(ctx, "GET", "/v1/storage/project/"+u.Unit.Object, nil, 0, "")
+	r, e := b.unitRequest(ctx, u.Unit, "GET", false, nil, 0, "")
 	if e != nil {
 		return e
 	}
@@ -440,7 +443,7 @@ func (b *Bridge) write(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unit lease/length invalid", 422)
 		return
 	}
-	response, e := b.backendRequest(r.Context(), "PUT", "/v1/verified/project/"+u.Unit.Object, r.Body, r.ContentLength, u.Unit.SHA256)
+	response, e := b.unitRequest(r.Context(), u.Unit, "PUT", true, r.Body, r.ContentLength, u.Unit.SHA256)
 	if e != nil {
 		http.Error(w, e.Error(), 502)
 		return
@@ -483,7 +486,7 @@ func (b *Bridge) read(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	response, e := b.backendRequest(r.Context(), "GET", "/v1/storage/project/"+u.Unit.Object, nil, 0, "")
+	response, e := b.unitRequest(r.Context(), u.Unit, "GET", false, nil, 0, "")
 	if e != nil {
 		http.Error(w, e.Error(), 502)
 		return

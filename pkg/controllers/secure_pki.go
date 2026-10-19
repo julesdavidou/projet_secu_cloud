@@ -93,7 +93,8 @@ func ProvisionPKI(cfg Config, out string) error {
 			return errors.New("invalid CA key type")
 		}
 	}
-	if !bytes.Equal(ca.PublicKey.(ed25519.PublicKey), key.Public().(ed25519.PublicKey)) {
+	caPublic, ok := ca.PublicKey.(ed25519.PublicKey)
+	if !ok || !ca.IsCA || time.Now().After(ca.NotAfter) || !bytes.Equal(caPublic, key.Public().(ed25519.PublicKey)) {
 		return errors.New("CA key mismatch")
 	}
 	actors := map[string][]string{"central": {"central"}, "web": {"web"}, "auth": {"auth"}, "broker": {"broker"}, "admin": {"admin"}, "owner-a": {"owner-a", "localhost"}, "owner-b": {"owner-b", "localhost"}}
@@ -106,7 +107,6 @@ func ProvisionPKI(cfg Config, out string) error {
 		actors["edge-"+n.ID] = []string{n.ID, "edge-" + n.ID, u.Hostname()}
 		actors["broker-"+n.ID] = []string{"broker-" + n.ID, "broker-" + lower(n.Zone)}
 		actors["reconstructor-"+n.ID] = []string{"reconstructor-" + lower(n.Zone), "reconstructor-" + n.ID}
-		actors["provisioner-"+n.ID] = []string{"provisioner-" + n.ID, "provisioner-" + lower(n.Zone)}
 	}
 	for actor, names := range actors {
 		dir := filepath.Join(root, actor)
@@ -162,6 +162,59 @@ func ProvisionPKI(cfg Config, out string) error {
 			return e
 		}
 	}
+	for _, node := range cfg.Nodes {
+		dir := filepath.Join(root, "storage-issuer-"+node.ID)
+		crtPath, keyPath := filepath.Join(dir, "tls.crt"), filepath.Join(dir, "tls.key")
+		persisted, ce := os.ReadFile(crtPath)
+		persistedKey, ke := os.ReadFile(keyPath)
+		if ce == nil && ke == nil {
+			block, _ := pem.Decode(persisted)
+			keyBlock, _ := pem.Decode(persistedKey)
+			if block == nil || keyBlock == nil {
+				return errors.New("invalid storage issuer files")
+			}
+			issuer, e := x509.ParseCertificate(block.Bytes)
+			if e != nil {
+				return e
+			}
+			parsed, e := x509.ParsePKCS8PrivateKey(keyBlock.Bytes)
+			issuerKey, ok := parsed.(ed25519.PrivateKey)
+			issuerPublic, publicOK := issuer.PublicKey.(ed25519.PublicKey)
+			if e != nil || !ok || !publicOK || !bytes.Equal(issuerPublic, issuerKey.Public().(ed25519.PublicKey)) || issuer.CheckSignatureFrom(ca) != nil || !issuer.IsCA || time.Now().After(issuer.NotAfter) || !issuer.MaxPathLenZero || len(issuer.PermittedDNSDomains) != 1 || issuer.PermittedDNSDomains[0] != ".storage-"+lower(node.ID)+".internal" || len(issuer.ExtKeyUsage) != 1 || issuer.ExtKeyUsage[0] != x509.ExtKeyUsageServerAuth {
+				return errors.New("storage issuer invalid, mismatched or expired; explicit recovery required")
+			}
+			continue
+		} else if !errors.Is(ce, os.ErrNotExist) || !errors.Is(ke, os.ErrNotExist) {
+			return errors.New("partial storage issuer; refusing replacement")
+		}
+		pub, priv, e := ed25519.GenerateKey(rand.Reader)
+		if e != nil {
+			return e
+		}
+		serial, e := rand.Int(rand.Reader, new(big.Int).Lsh(big.NewInt(1), 128))
+		if e != nil {
+			return e
+		}
+		cert := &x509.Certificate{SerialNumber: serial, Subject: pkix.Name{CommonName: "storage-issuer-" + node.ID}, NotBefore: time.Now().Add(-time.Hour), NotAfter: time.Now().AddDate(1, 0, 0), IsCA: true, BasicConstraintsValid: true, MaxPathLen: 0, MaxPathLenZero: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, PermittedDNSDomainsCritical: true, PermittedDNSDomains: []string{".storage-" + lower(node.ID) + ".internal"}}
+		der, e := x509.CreateCertificate(rand.Reader, cert, ca, pub, key)
+		if e != nil {
+			return e
+		}
+		privDER, e := x509.MarshalPKCS8PrivateKey(priv)
+		if e != nil {
+			return e
+		}
+		if e = write(filepath.Join(dir, "tls.crt"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0644); e != nil {
+			return e
+		}
+		if e = write(filepath.Join(dir, "tls.key"), pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privDER}), 0640); e != nil {
+			return e
+		}
+		if e = write(filepath.Join(dir, "ca.crt"), certRaw, 0644); e != nil {
+			return e
+		}
+	}
+
 	return nil
 }
 func lower(s string) string {

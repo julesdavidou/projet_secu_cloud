@@ -79,6 +79,9 @@ func main() {
 	config := loadConfig()
 
 	store, err := storage.New(config.StorageRoot)
+	if tenant := os.Getenv("STORAGE_TENANT_ID"); tenant != "" {
+		store, err = storage.NewTenant(config.StorageRoot, tenant)
+	}
 	if err != nil {
 		log.Fatalf("storage initialization failed: %v", err)
 	}
@@ -241,14 +244,14 @@ func main() {
 		log.Fatal("HTTP authentication configuration invalid: ", guardErr)
 	}
 	server := &http.Server{
-		Addr:              ":8080",
+		Addr:              getEnv("STORAGE_HTTP_ADDR", ":8080"),
 		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
-		log.Printf("Edge %s listening on :8080", config.EdgeID)
+		log.Printf("Edge %s listening on %s", config.EdgeID, server.Addr)
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("HTTP server failed: %v", err)

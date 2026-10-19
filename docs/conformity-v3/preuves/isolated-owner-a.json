@@ -1,0 +1,11 @@
+{
+  "owner": "client-6f560c70-d77d-46ed-a28e-db99343a71b3",
+  "video_id": "v-28b2eb59b69b9f6ab630bbc9da04f6b9",
+  "source_sha256": "760377b11c6480dbd192017a65677a31563d5b7007f309e8970eff46168a3e1e",
+  "source_size": 1484048,
+  "publish_seconds": 12.22,
+  "cold_playback_seconds": 1.628,
+  "warm_playback_seconds": 0.05,
+  "integrity": "SIS-HESS-BLS12381-v3 + SHA256",
+  "physical_lab": "NOT_TESTED"
+}

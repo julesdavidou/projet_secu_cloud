@@ -48,6 +48,9 @@
         "interval": "2s",
         "timeout": "2s",
         "retries": 40
+      },
+      "environment": {
+        "BRIDGE_NODE_ID": "A1"
       }
     },
     "broker-b": {
@@ -73,6 +76,9 @@
         "interval": "2s",
         "timeout": "2s",
         "retries": 40
+      },
+      "environment": {
+        "BRIDGE_NODE_ID": "B1"
       }
     },
     "central": {
@@ -245,13 +251,15 @@
         "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
         "STORAGE_ROOT": "/data/files",
         "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-A1.http-token",
-        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin"
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
         "./.runtime/identities/edge-A1:/run/lab-secrets:ro",
         "./.runtime/pki/edge-A1:/run/tls:ro",
-        "edge-a-data:/data"
+        "edge-a-data:/data",
+        "./.runtime/tenant-A1:/run/tenant-backends:ro"
       ],
       "healthcheck": {
         "test": [
@@ -308,13 +316,15 @@
         "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
         "STORAGE_ROOT": "/data/files",
         "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-B1.http-token",
-        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin"
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json"
       },
       "volumes": [
         "./.runtime/config.json:/config/config.json:ro",
         "./.runtime/identities/edge-B1:/run/lab-secrets:ro",
         "./.runtime/pki/edge-B1:/run/tls:ro",
-        "edge-b-data:/data"
+        "edge-b-data:/data",
+        "./.runtime/tenant-B1:/run/tenant-backends:ro"
       ],
       "healthcheck": {
         "test": [

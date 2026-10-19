@@ -1,0 +1,50 @@
+name: Signed VOD and isolated owner storage V3
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  real-vod:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build and start separate secure laboratory
+        shell: pwsh
+        run: ./deploy/secure-v3/start.ps1
+      - name: SIS/IBS tests with real cryptographic library
+        run: docker run --rm --cap-drop ALL --security-opt no-new-privileges:true caribou/secure-v3-security:dev python -m unittest test_secure_sis -v
+      - name: Two real owners, two zones, local signatures and byte-identical playback
+        shell: pwsh
+        run: ./deploy/secure-v3/smoke.ps1
+      - name: Actual isolation, corruption, absence, direct peer brokers and persistent restart
+        shell: pwsh
+        run: ./deploy/secure-v3/resilience.ps1
+      - name: Runtime diagnostics
+        if: always()
+        run: docker compose -f deploy/secure-v3/compose.yaml logs --no-color --tail 50
+      - name: Preserve non-secret evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: secure-v3-${{ github.sha }}
+          path: deploy/secure-v3/results/*.json
+      - name: Stop only disposable CI containers, retain volumes
+        if: always()
+        run: |
+          docker compose -f deploy/secure-v3/compose.yaml down
+          ids=$(docker ps -aq --filter label=caribou.project=caribou-secure-v3)
+          if [ -n "$ids" ]; then docker stop $ids; fi
+  arm64-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Build all secure components for ARM64 (QEMU, no physical hardware)
+        run: |
+          docker buildx build --platform linux/arm64 -f deploy/lab/Dockerfile --load -t caribou/secure-v3-control:arm64 .
+          docker run --rm --platform linux/arm64 --network none --cap-drop ALL --security-opt no-new-privileges:true -v "$PWD/deploy/secure-v3/arm64-smoke.sh:/test.sh:ro" caribou/secure-v3-control:arm64 sh /test.sh
+          for file in deploy/secure-v3/Dockerfile.security deploy/secure-v3/Dockerfile.web deploy/secure-v3/Dockerfile.auth; do
+            docker buildx build --platform linux/arm64 -f "$file" --output type=cacheonly .
+          done

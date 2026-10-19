@@ -43,6 +43,7 @@ type Registered struct {
 	Endpoint string         `json:"endpoint"`
 }
 type Unit struct {
+	OwnerID string `json:"owner_id,omitempty"`
 	placement.Assignment
 	SHA256   string `json:"sha256"`
 	Object   string `json:"object"`
