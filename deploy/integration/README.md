@@ -43,7 +43,7 @@ docker compose -f deploy/integration/compose.yaml exec -T web python3 /tmp/contr
 ```
 
 ```powershell
-# Les scripts ne réinitialisent pas les volumes.
+# Les scripts ne réinitialisent pas les volumes. Une topologie modifiée provoque la recréation des services pour recharger configuration et ACL ; les sessions Java doivent alors être renouvelées.
 docker compose -f deploy/integration/compose.yaml ps
 docker compose -f deploy/integration/compose.yaml logs --tail 100 web central zone-a zone-b edge-a edge-b
 # Arrêter en conservant toutes les données :
@@ -79,7 +79,7 @@ Aucune image n'est publiée dans un registre automatiquement. Le PC peut héberg
 $env:LAB_BIND_IP='IP_LAN_REELLE_PC' # broker et API opérateur
 $env:MQTT_PORT='1884'
 $env:WEB_BIND_IP='127.0.0.1' # ou IP LAN si des navigateurs externes sont nécessaires
-# Ne pas lancer en parallèle avec le profil local du même projet.
+# Le lanceur arrête les quatre services Edge locaux de ce projet pour éviter les identités MQTT en double.
 .\deploy\integration\start.ps1 -SkipBuild -ExternalEdges -Topology .\deploy\integration\.runtime\topology.lab.json
 .\deploy\integration\export-edge.ps1 -Id A1 -Destination .\deploy\integration\.runtime\exports-A1
 .\deploy\integration\export-edge.ps1 -Id B1 -Destination .\deploy\integration\.runtime\exports-B1

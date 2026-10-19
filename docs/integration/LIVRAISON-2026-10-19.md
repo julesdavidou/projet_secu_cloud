@@ -1,6 +1,6 @@
 # Livraison CaribouTV intégrée — 19 octobre 2026
 
-Branche : `codex/integration-cariboutv-v1`, base `codex/placement-edge-v1` après fusion préexistante de PR #2. Les trois merges locaux compatibles réunissent main, auth et video_streaming. Aucun merge de PR ni réécriture des branches des collègues. Les changements de collègues incompatibles restent accessibles et nommés dans l'[audit](AUDIT-2026-10-19.md).
+PR distincte **[draft #4](https://github.com/julesdavidou/projet_secu_cloud/pull/4)**, sans merge. Branche : `codex/integration-cariboutv-v1`, base `codex/placement-edge-v1` après fusion préexistante de PR #2. Les trois merges locaux compatibles réunissent main, auth et video_streaming. Aucun merge de PR ni réécriture des branches des collègues. Les changements de collègues incompatibles restent accessibles et nommés dans l'[audit](AUDIT-2026-10-19.md).
 
 ## Prêt à tester maintenant
 
@@ -28,6 +28,8 @@ Ouvrir **http://localhost:18090/integration/** ; se connecter/créer un compte d
 | Sources Dan récentes | PASS compilation et vet du module isolé ; aucun test fonctionnel fourni, non activé dans le banc | [log](evidence/legacy-dan-build.txt) |
 | Python préservé | PASS syntaxe de 15 fichiers ; ce contrôle ne valide pas SIS/IBS/live ni les anciennes passerelles | [log](evidence/python-syntax.txt) |
 | Images | Trois images contenant AMD64 + ARM64, chargées localement, aucune publication registre | [web](evidence/image-web.txt), [control](evidence/image-control.txt), [auth](evidence/image-auth.txt) |
+
+[Comparaison Git des composants préservés](evidence/preservation.json) : scheduler/contrôleurs, frontend dist et métier auth inchangés. Les vérifications GitHub supplémentaires sont consultables dans la PR ; les preuves locales ci-dessus ont été exécutées indépendamment.
 
 Les tests unitaires `internal/webapp` utilisent des doubles HTTP pour les cas de refus/simulation et de métadonnées corrompues. Les tests de bout en bout ci-dessus utilisent de vrais services Java/Go/MQTT/SQLite/Edge et de vrais octets vidéo. Seule leur mire d'entrée est synthétique. Aucun mock n'est accepté comme preuve READY dans l'API spectateur.
 
