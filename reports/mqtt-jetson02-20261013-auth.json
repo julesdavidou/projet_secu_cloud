@@ -1,0 +1,145 @@
+{
+  "broker": "192.168.1.1:1883",
+  "edge_id": "jetson02",
+  "test_id": "84148da1589b4cb288f99919fad1f0d2",
+  "username": "fl_hub",
+  "started_at": "2026-10-13T16:22:01.880703Z",
+  "checks": [
+    {
+      "name": "MQTT credentials accepted and test publication acknowledged",
+      "result": "PASS",
+      "details": {
+        "username": "fl_hub",
+        "qos": 1
+      }
+    },
+    {
+      "name": "HTTP health and ARM64 monitoring",
+      "result": "PASS",
+      "details": {
+        "health": {
+          "edge_id": "jetson02",
+          "status": "ok"
+        },
+        "architecture": "arm64"
+      }
+    },
+    {
+      "name": "Agent connects to external broker and publishes online",
+      "result": "PASS",
+      "details": {
+        "edge_id": "jetson02",
+        "state": "online"
+      }
+    },
+    {
+      "name": "Two successive MQTT heartbeats received",
+      "result": "PASS",
+      "details": [
+        {
+          "edge_id": "jetson02",
+          "zone": "jetson",
+          "architecture": "arm64",
+          "os": "linux",
+          "cpu_percent": 2.8232636931449617,
+          "memory": {
+            "total": 4148043776,
+            "used": 1775022080,
+            "free": 2373021696
+          },
+          "storage": {
+            "total": 62166003712,
+            "used": 19460145152,
+            "free": 40007548928
+          },
+          "timestamp": "2026-10-13T16:22:17.915661984Z"
+        },
+        {
+          "edge_id": "jetson02",
+          "zone": "jetson",
+          "architecture": "arm64",
+          "os": "linux",
+          "cpu_percent": 1.3567839194054392,
+          "memory": {
+            "total": 4148043776,
+            "used": 1775259648,
+            "free": 2372784128
+          },
+          "storage": {
+            "total": 62166003712,
+            "used": 19460145152,
+            "free": 40007548928
+          },
+          "timestamp": "2026-10-13T16:22:22.920722071Z"
+        }
+      ]
+    },
+    {
+      "name": "Broker command received and logged by agent",
+      "result": "PASS",
+      "details": {
+        "topic": "edge/jetson02/commands/test",
+        "marker": "84148da1589b4cb288f99919fad1f0d2-before"
+      }
+    },
+    {
+      "name": "Last Will offline and automatic reconnect without restarting container",
+      "result": "PASS",
+      "details": [
+        {
+          "edge_id": "jetson02",
+          "state": "online"
+        },
+        {
+          "edge_id": "jetson02",
+          "state": "offline"
+        },
+        {
+          "edge_id": "jetson02",
+          "state": "online"
+        }
+      ]
+    },
+    {
+      "name": "Heartbeats and command subscription resume after reconnect",
+      "result": "PASS",
+      "details": {
+        "heartbeat": {
+          "edge_id": "jetson02",
+          "zone": "jetson",
+          "architecture": "arm64",
+          "os": "linux",
+          "cpu_percent": 8.413098236678909,
+          "memory": {
+            "total": 4148043776,
+            "used": 1776566272,
+            "free": 2371477504
+          },
+          "storage": {
+            "total": 62166003712,
+            "used": 19460145152,
+            "free": 40007548928
+          },
+          "timestamp": "2026-10-13T16:22:27.920136838Z"
+        },
+        "command_marker": "84148da1589b4cb288f99919fad1f0d2-after"
+      }
+    },
+    {
+      "name": "Container stopped cleanly",
+      "result": "PASS",
+      "details": {
+        "status": "exited",
+        "exit_code": 0
+      }
+    }
+  ],
+  "retained_status_after_graceful_stop": {
+    "edge_id": "jetson02",
+    "state": "online"
+  },
+  "known_limitations": [
+    "Graceful shutdown does not publish offline; retained state remains online. Last Will works for an unexpected disconnection."
+  ],
+  "finished_at": "2026-10-13T16:22:31.007976Z"
+}

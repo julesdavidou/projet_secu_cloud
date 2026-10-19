@@ -1,0 +1,13 @@
+{
+  "name": "cariboutv-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Interface spectateur CaribouTV, en HTML, CSS et JavaScript natifs",
+  "scripts": {
+    "dev": "node dev-server.mjs",
+    "start": "node dev-server.mjs",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=20" }
+}
