@@ -75,6 +75,15 @@ with tempfile.TemporaryDirectory(prefix="caribou-test-") as temp:
     part,headers=request(alice,playback["url"],headers={"Range":"bytes=0-127"},expected=206)
     assert part==raw[:128] and headers["Content-Range"].startswith("bytes 0-127/"),headers
     passed("Edge block reconstruction, exact native MP4, decode video+audio, HTTP Range206")
+    fallback=Path(temp)/"mpeg4-source.mp4"
+    subprocess.run(["ffmpeg","-v","error","-i",str(source),"-c:v","mpeg4","-c:a","copy",str(fallback)],check=True)
+    second=js(alice,"/api/videos?title=non-native-codec","POST",fallback.read_bytes(),{"Content-Type":"video/mp4"},201)
+    assert request(alice,"/api/videos/"+second["id"]+"/original")[0]==fallback.read_bytes()
+    converted=js(alice,"/api/videos/"+second["id"]+"/playback")
+    decoded=Path(temp)/"converted.mp4";decoded.write_bytes(request(alice,converted["url"])[0])
+    subprocess.run(["ffmpeg","-v","error","-i",str(decoded),"-f","null","-"],check=True)
+    passed("non-native MPEG4 source retained exactly; HLS assets reconstructed on Edge and remuxed for playback")
+
     profile=js(alice,"/api/me","PATCH",{"name":"Integration Test","course":"Cloud","promotion":"2026"})
     assert profile["name"]=="Integration Test"
     profile=js(alice,"/api/me/favorites/"+video,"PUT");assert video in profile["favorites"]

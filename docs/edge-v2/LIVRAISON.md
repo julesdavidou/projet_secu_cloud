@@ -26,7 +26,7 @@ Les extraits sont dans [preuves/](preuves/). Les journaux complets sont dans le 
 | Go racine, serveur-zone et lab/placement | compilation, tests, race et vet réussis dans Docker AMD64 |
 | Python | 6 tests réussis : tailles variables, ordre, manque/doublon/corruption, contexte du prototype SIS/IBS |
 | Frontend existant | 9 tests réussis, fichiers du frontend inchangés |
-| Nouveau parcours réel | login Java, API vidéo, stockage HTTP réel, SQLite READY, source originale exacte, décodage vidéo+audio, Range206, droits privés/partagés et isolation |
+| Nouveau parcours réel | login Java, API vidéo, stockage HTTP réel, SQLite READY, source originale exacte, codec MPEG4 non natif avec reconstruction HLS/remux, décodage vidéo+audio, Range206, droits privés/partagés et isolation |
 | Deux zones et brokers distincts | vrais fichiers répartis A1/B1 ; A1 MQTT3.1.1, B1 MQTT5 ; commandes/ACK et plan Go idempotent |
 | Mobilité | changement logique de zone A1 A→B→A ; identités/objets/hashes conservés ; reconstruction exacte après déplacement |
 | Corruption / absence | octets sur disque réellement altérés ou fichier temporairement déplacé ; HTTP502, cache lecture invalidé ; restauration exacte dans finally |

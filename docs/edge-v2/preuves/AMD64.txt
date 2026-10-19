@@ -67,3 +67,17 @@ PASS invalid media never published READY
 PASS explicitly shared video readable by another signed-in account only
 PASS unchanged spectator frontend served with runtime API configuration
 PASS logout revokes session, stable client ID on relogin
+
+DERNIER SMOKE V2, incluant codec non natif:
+PASS Java login and session-required API
+PASS wrong password denied (colleague HTTP-200 failure contract preserved)
+PASS colleague HLS segmentation -> Go scheduler -> real Edge upload READY
+PASS SQLite READY catalogue, real SHA256 receipts, private ownership isolation
+PASS original MP4 reconstructed on Edge: exact source bytes/SHA256, private download isolated
+PASS Edge block reconstruction, exact native MP4, decode video+audio, HTTP Range206
+PASS non-native MPEG4 source retained exactly; HLS assets reconstructed on Edge and remuxed for playback
+PASS profiles, favorites, resume, user isolation, cross-origin mutation denial
+PASS invalid media never published READY
+PASS explicitly shared video readable by another signed-in account only
+PASS unchanged spectator frontend served with runtime API configuration
+PASS logout revokes session, stable client ID on relogin
