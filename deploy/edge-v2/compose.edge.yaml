@@ -1,0 +1,62 @@
+name: caribou-managed-edge
+services:
+  broker-edge:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /entrypoint.sh]
+    volumes:
+      - ./broker-entrypoint.sh:/entrypoint.sh:ro
+      - ./edge-config/broker:/provision:ro
+      - broker-data:/mosquitto/data
+    healthcheck:
+      test: [CMD-SHELL, 'nc -z 127.0.0.1 1883']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  edge:
+    image: ${CONTROL_IMAGE:-caribou/edge-v2-control:dev}
+    command: [edge-agent]
+    restart: unless-stopped
+    init: true
+    environment:
+      CONTROLLERS_CONFIG: /config/config.json
+      SECRETS_DIR: /run/lab-secrets
+      EDGE_ID: ${EDGE_ID:?Set provisioned identity}
+      MQTT_BROKER: mqtt://broker-edge:1883
+      MQTT_PROTOCOL: ${MQTT_PROTOCOL:-5}
+      MQTT_JSON_ENVELOPE: '1'
+      EDGE_CONTROL_ENABLED: '1'
+      EDGE_MODE: real-http
+      EDGE_BACKEND_URL: http://127.0.0.1:8080
+      EDGE_RECONSTRUCTOR_URL: http://reconstructor:9200
+      EDGE_LEDGER_PATH: /data/control/edge-ledger.json
+      STORAGE_ROOT: /data/files
+      HTTP_AUTH_TOKEN_FILE: /run/lab-secrets/edge-${EDGE_ID}.http-token
+    ports: ["${EDGE_BIND_IP:?Set real Edge IP}:${EDGE_HTTP_PORT:-18081}:8088"]
+    volumes:
+      - ./edge-config/config.json:/config/config.json:ro
+      - ./edge-config/identity:/run/lab-secrets:ro
+      - edge-data:/data
+    depends_on:
+      broker-edge: {condition: service_healthy}
+      reconstructor: {condition: service_healthy}
+  reconstructor:
+    image: ${READER_IMAGE:-caribou/edge-v2-reader:dev}
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+    environment:
+      WORKER_TOKEN_FILE: /run/identity/edge-${EDGE_ID}.http-token
+      ALLOWED_EDGE_ORIGINS: ${ALLOWED_EDGE_ORIGINS:?Set all provisioned Edge HTTP origins}
+      WORKERS: '1'
+      PREFETCH: '0'
+    volumes:
+      - ./edge-config/identity:/run/identity:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9200/health',timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+volumes:
+  broker-data:
+  edge-data:

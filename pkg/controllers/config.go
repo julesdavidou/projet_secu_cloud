@@ -130,7 +130,11 @@ func NewBus(ctx context.Context, id string, subs []string, h mqttbus.Handler, st
 	if e != nil {
 		return nil, e
 	}
-	return mqttbus.New(ctx, Env("MQTT_BROKER", "mqtt://broker:1883"), id, password, subs, h, state)
+	b, e := mqttbus.NewWithProtocol(ctx, Env("MQTT_BROKER", "mqtt://broker:1883"), id, password, subs, h, state, Env("MQTT_PROTOCOL", "5"))
+	if e == nil && Env("MQTT_JSON_ENVELOPE", "0") == "1" {
+		b.EnableJSONEnvelope()
+	}
+	return b, e
 }
 func Authorized(c Config, sender string) bool {
 	return sender == "central" || sender == "admin" || strings.HasPrefix(sender, "zone-") && c.HasZone(strings.TrimPrefix(sender, "zone-"))

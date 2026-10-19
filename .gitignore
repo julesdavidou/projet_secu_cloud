@@ -29,3 +29,7 @@ deploy/lab/config/topology.lab-ready.json
 deploy/integration/.runtime/
 deploy/integration/results/
 web-api.exe
+
+# Independent Edge MQTT/reconstruction integration secrets and results
+deploy/edge-v2/.runtime/
+deploy/edge-v2/results/

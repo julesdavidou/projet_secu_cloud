@@ -12,6 +12,8 @@ func main() {
 	path := flag.String("config", "/input/topology.json", "public configuration")
 	out := flag.String("out", "/output", "provisioning output")
 	mode := flag.String("mode", "real-http", "real-http or mock")
+	edgeBrokers := flag.Bool("edge-brokers", false, "provision per-Edge broker routes")
+	hub := flag.String("hub", "broker:1883", "reachable MQTT hub host:port")
 	flag.Parse()
 	raw, e := os.ReadFile(*path)
 	if e != nil {
@@ -26,6 +28,11 @@ func main() {
 	}
 	if e = controllers.Provision(cfg, *out); e != nil {
 		log.Fatal(e)
+	}
+	if *edgeBrokers {
+		if e = controllers.ProvisionEdgeBrokers(cfg, *out, *hub); e != nil {
+			log.Fatal(e)
+		}
 	}
 	log.Print("configuration and distinct identities provisioned; secret values omitted")
 }

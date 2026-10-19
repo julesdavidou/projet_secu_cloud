@@ -1,0 +1,38 @@
+Validation locale 2026-10-19. Les fichiers media des smokes sont reels. Matériel physique NON TESTE. CI distante distincte.
+
+SOURCE: python-tests.log
+test_missing_duplicate_identity_size_padding (test_reconstruction_contract.BlocksTest.test_missing_duplicate_identity_size_padding) ... ok
+test_variable_length_and_order (test_reconstruction_contract.BlocksTest.test_variable_length_and_order) ... ok
+test_corrupt_missing_duplicate_and_false_final_hash (test_reconstruction_contract.JobTest.test_corrupt_missing_duplicate_and_false_final_hash) ... ok
+test_reordered_real_bytes (test_reconstruction_contract.JobTest.test_reordered_real_bytes) ... ok
+test_wrong_origin_and_unpinned_crypto_refused (test_reconstruction_contract.JobTest.test_wrong_origin_and_unpinned_crypto_refused) ... ok
+test_prototype_identity_and_complete_context_binding (test_sis_binding.SISBindingTest.test_prototype_identity_and_complete_context_binding) ... ok
+Ran 6 tests in 24.023s
+OK
+
+SOURCE: frontend-tests.log
+# tests 9
+# pass 9
+# fail 0
+
+SOURCE: go-tests-final.log
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/internal/edgecontrol	0.024s
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/internal/storage	(cached)
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/internal/webapp	(cached)
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/controllers	(cached)
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/media	(cached)
+#9 0.996 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/placement	(cached)
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/internal/edgecontrol	1.062s
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/internal/storage	(cached)
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/internal/webapp	(cached)
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/controllers	(cached)
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/media	(cached)
+#9 3.659 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/placement	(cached)
+#10 1.167 ok  	serveur-zone/app	(cached)
+#10 1.929 ok  	serveur-zone/app	(cached)
+#11 0.344 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/catalog	(cached)
+#11 0.666 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/mqttbus	0.071s
+#11 0.709 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/service	(cached)
+#11 0.850 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/catalog	(cached)
+#11 2.335 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/mqttbus	1.079s
+#11 2.335 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/service	(cached)

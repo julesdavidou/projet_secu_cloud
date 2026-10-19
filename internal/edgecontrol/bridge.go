@@ -333,6 +333,8 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			return nil, errors.New("no stored completion to replay")
 		}
 		return map[string]int{"replayed": count}, nil
+	case "DELETE_OBJECT":
+		return nil, errors.New("managed deletion is not implemented; catalogue and quota must be coordinated")
 	case "MOCK_STORE":
 		if b.mode != "mock" || sender != "central" {
 			return nil, errors.New("MOCK_STORE forbidden in real-http")
@@ -357,7 +359,7 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			}
 		}
 		return map[string]string{"proof": "MOCK"}, b.announce(ctx, true)
-	case "STATUS":
+	case "STATUS", "REQUEST_STATUS", "REFRESH_STATE":
 		if sender != "central" && !controllers.Authorized(b.cfg, sender) {
 			return nil, errors.New("status unauthorized")
 		}
@@ -543,7 +545,8 @@ func Run(ctx context.Context, cfg controllers.Config) error {
 	controllers.Health(mux, ready.Load)
 	storage := http.NewServeMux()
 	storage.HandleFunc("PUT /store/{video}/{extent}", b.write)
-	storage.HandleFunc("GET /store/{video}/{extent}", b.read)
+	mux.HandleFunc("GET /store/{video}/{extent}", b.readAuthorized)
+	mux.Handle("POST /reconstruct", controllers.Bearer(b.token, http.HandlerFunc(b.reconstruct)))
 	mux.Handle("/store/", controllers.Bearer(b.token, storage))
 	return controllers.Serve(ctx, controllers.Env("HTTP_ADDR", ":8088"), mux)
 }

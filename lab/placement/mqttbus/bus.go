@@ -15,10 +15,12 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/eclipse/paho.golang/autopaho"
 	"github.com/eclipse/paho.golang/paho"
+	mqtt3 "github.com/eclipse/paho.mqtt.golang"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 )
 
@@ -26,13 +28,16 @@ const Root = "lab/placement/v1/"
 const MaxPayload = 1024 * 1024
 
 type Request struct {
-	Op      string          `json:"op"`
-	Body    json.RawMessage `json:"body"`
-	Expires time.Time       `json:"expires_at"`
+	Op            string          `json:"op"`
+	Body          json.RawMessage `json:"body"`
+	Expires       time.Time       `json:"expires_at"`
+	CorrelationID string          `json:"correlation_id,omitempty"`
+	ReplyTo       string          `json:"reply_to,omitempty"`
 }
 type Response struct {
-	Body  json.RawMessage `json:"body,omitempty"`
-	Error string          `json:"error,omitempty"`
+	Body          json.RawMessage `json:"body,omitempty"`
+	Error         string          `json:"error,omitempty"`
+	CorrelationID string          `json:"correlation_id,omitempty"`
 }
 type Handler func(context.Context, string, Request) (any, error)
 type pending struct {
@@ -40,13 +45,15 @@ type pending struct {
 	result chan Response
 }
 type Bus struct {
-	id      string
-	cm      *autopaho.ConnectionManager
-	mu      sync.Mutex
-	pending map[string]pending
-	handler Handler
-	state   func(string, []byte, bool)
-	slots   chan struct{}
+	id           string
+	cm           *autopaho.ConnectionManager
+	v3           mqtt3.Client
+	jsonEnvelope atomic.Bool
+	mu           sync.Mutex
+	pending      map[string]pending
+	handler      Handler
+	state        func(string, []byte, bool)
+	slots        chan struct{}
 }
 
 func Decode(raw []byte, out any) error {
@@ -64,6 +71,15 @@ func Decode(raw []byte, out any) error {
 	return nil
 }
 func New(ctx context.Context, broker, id, password string, subscriptions []string, h Handler, state func(string, []byte, bool)) (*Bus, error) {
+	return NewWithProtocol(ctx, broker, id, password, subscriptions, h, state, "5")
+}
+func NewWithProtocol(ctx context.Context, broker, id, password string, subscriptions []string, h Handler, state func(string, []byte, bool), protocol string) (*Bus, error) {
+	if protocol != "5" && protocol != "3.1.1" {
+		return nil, errors.New("MQTT_PROTOCOL must be 5 or 3.1.1")
+	}
+	if protocol == "3.1.1" {
+		return newV3(ctx, broker, id, password, subscriptions, h, state)
+	}
 	if !placement.ValidID(id) || password == "" {
 		return nil, errors.New("MQTT identity and password required")
 	}
@@ -117,6 +133,21 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 	if len(p.Payload) > MaxPayload {
 		return
 	}
+	if p.Properties == nil || len(p.Properties.CorrelationData) == 0 {
+		var wire struct {
+			CorrelationID string `json:"correlation_id"`
+			ReplyTo       string `json:"reply_to"`
+		}
+		if json.Unmarshal(p.Payload, &wire) == nil {
+			corr, e := hex.DecodeString(wire.CorrelationID)
+			if e == nil && len(corr) == 16 {
+				p.Properties = &paho.PublishProperties{CorrelationData: corr, ResponseTopic: wire.ReplyTo}
+			}
+		}
+	}
+	if len(p.Payload) > MaxPayload {
+		return
+	}
 	replyPrefix := Root + b.id + "/reply/"
 	requestPrefix := Root + b.id + "/request/"
 	if strings.HasPrefix(p.Topic, replyPrefix) {
@@ -132,7 +163,7 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 			return
 		}
 		var response Response
-		if Decode(p.Payload, &response) != nil {
+		if Decode(p.Payload, &response) != nil || (response.CorrelationID != "" && response.CorrelationID != key) {
 			return
 		}
 		select {
@@ -153,6 +184,9 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 		if Decode(p.Payload, &req) != nil || req.Op == "" || !time.Now().Before(req.Expires) || req.Expires.Sub(time.Now()) > time.Minute {
 			return
 		}
+		if (req.CorrelationID != "" || req.ReplyTo != "") && (req.CorrelationID != hex.EncodeToString(p.Properties.CorrelationData) || req.ReplyTo != p.Properties.ResponseTopic) {
+			return
+		}
 		select {
 		case b.slots <- struct{}{}:
 		default:
@@ -164,13 +198,16 @@ func (b *Bus) receive(ctx context.Context, p *paho.Publish) {
 			defer cancel()
 			value, err := b.handler(op, sender, req)
 			response := Response{}
+			if req.CorrelationID != "" {
+				response.CorrelationID = req.CorrelationID
+			}
 			if err != nil {
 				response.Error = err.Error()
 			} else {
 				response.Body, _ = json.Marshal(value)
 			}
 			raw, _ := json.Marshal(response)
-			_, _ = b.cm.Publish(op, &paho.Publish{Topic: p.Properties.ResponseTopic, QoS: 1, Payload: raw, Properties: &paho.PublishProperties{CorrelationData: p.Properties.CorrelationData}})
+			_, _ = b.publishPacket(op, &paho.Publish{Topic: p.Properties.ResponseTopic, QoS: 1, Payload: raw, Properties: &paho.PublishProperties{CorrelationData: p.Properties.CorrelationData}})
 		}()
 		return
 	}
@@ -190,18 +227,23 @@ func (b *Bus) Call(ctx context.Context, target, op string, value, out any) error
 	if err != nil {
 		return err
 	}
-	raw, err := json.Marshal(Request{op, body, deadline})
+	correlation := make([]byte, 16)
+	if _, err = rand.Read(correlation); err != nil {
+		return err
+	}
+	key := hex.EncodeToString(correlation)
+	reqBody := Request{Op: op, Body: body, Expires: deadline}
+	if b.v3 != nil || b.jsonEnvelope.Load() {
+		reqBody.CorrelationID = key
+		reqBody.ReplyTo = Root + b.id + "/reply/" + target
+	}
+	raw, err := json.Marshal(reqBody)
 	if err != nil {
 		return err
 	}
 	if len(raw) > MaxPayload {
 		return errors.New("manifest exceeds MQTT control limit; use external resolver")
 	}
-	correlation := make([]byte, 16)
-	if _, err = rand.Read(correlation); err != nil {
-		return err
-	}
-	key := hex.EncodeToString(correlation)
 	result := make(chan Response, 1)
 	b.mu.Lock()
 	if len(b.pending) >= 64 {
@@ -212,7 +254,7 @@ func (b *Bus) Call(ctx context.Context, target, op string, value, out any) error
 	b.mu.Unlock()
 	defer func() { b.mu.Lock(); delete(b.pending, key); b.mu.Unlock() }()
 	expiry := uint32(time.Until(deadline).Seconds()) + 1
-	ack, err := b.cm.Publish(ctx, &paho.Publish{Topic: Root + target + "/request/" + b.id, QoS: 1, Payload: raw, Properties: &paho.PublishProperties{ResponseTopic: Root + b.id + "/reply/" + target, CorrelationData: correlation, MessageExpiry: &expiry}})
+	ack, err := b.publishPacket(ctx, &paho.Publish{Topic: Root + target + "/request/" + b.id, QoS: 1, Payload: raw, Properties: &paho.PublishProperties{ResponseTopic: Root + b.id + "/reply/" + target, CorrelationData: correlation, MessageExpiry: &expiry}})
 	if err != nil {
 		return err
 	}
@@ -240,7 +282,7 @@ func (b *Bus) Publish(ctx context.Context, topic string, value any, qos byte, re
 	if len(raw) > MaxPayload {
 		return errors.New("payload too large")
 	}
-	ack, err := b.cm.Publish(ctx, &paho.Publish{Topic: topic, QoS: qos, Retain: retained, Payload: raw, Properties: &paho.PublishProperties{MessageExpiry: &ttl}})
+	ack, err := b.publishPacket(ctx, &paho.Publish{Topic: topic, QoS: qos, Retain: retained, Payload: raw, Properties: &paho.PublishProperties{MessageExpiry: &ttl}})
 	if err != nil {
 		return err
 	}
@@ -267,3 +309,7 @@ func (b *Bus) Retry(ctx context.Context, target, op string, value, out any) erro
 	}
 	return err
 }
+
+// EnableJSONEnvelope permits MQTT5 callers to address MQTT3 peers. Enable on all
+// peers in a mixed deployment; the default preserves pre-v2 MQTT5 wire format.
+func (b *Bus) EnableJSONEnvelope() { b.jsonEnvelope.Store(true) }

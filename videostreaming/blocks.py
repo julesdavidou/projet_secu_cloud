@@ -15,6 +15,7 @@ class BlockEnvelope:
     block_count: int
     segment_byte_length: int
     payload: bytes
+    block_size: int = BLOCK_SIZE
 
     def to_wire_dict(self) -> dict:
         return {
@@ -73,27 +74,32 @@ def segment_to_blocks(
                 block_count=n,
                 segment_byte_length=len(data),
                 payload=pad_block(chunk, block_size),
+                block_size=block_size,
             )
         )
     return blocks
 
 def reassemble_segment(blocks: list[BlockEnvelope]) -> bytes:
-    """Reconstitue les données du segment à partir d'une liste d'enveloppes de blocs.
+    """Restore order, reject ambiguous/missing blocks, and remove only zero padding.
 
-    Trie les blocs par block_index, concatène les payloads et tronque le
-    padding à la taille d'origine (segment_byte_length).
+    Cryptographic checks are performed against the trusted manifest/SIS before
+    calling this function; structural validation alone cannot detect changed data.
     """
     if not blocks:
-        return b""
-
-    # Trie les blocs dans l'ordre croissant de leur index
-    sorted_blocks = sorted(blocks, key=lambda b: b.block_index)
-
-    # Récupère la taille initiale attendue du segment (stockée dans les métadonnées)
-    expected_length = sorted_blocks[0].segment_byte_length
-
-    # Concatène tous les payloads
-    full_payload = b"".join(b.payload for b in sorted_blocks)
-
-    # Retire le bourrage (padding) en tronquant la taille
-    return full_payload[:expected_length]
+        raise ValueError("missing blocks")
+    first = blocks[0]
+    length, size = first.segment_byte_length, first.block_size
+    count = block_count_for_segment(length, size)
+    if length <= 0 or count != first.block_count or len(blocks) != count:
+        raise ValueError("incomplete block set")
+    identity = (first.video_id, first.segment_name, first.segment_index, count, length, size)
+    ordered = sorted(blocks, key=lambda block: block.block_index)
+    output = []
+    for i, block in enumerate(ordered):
+        if (block.video_id, block.segment_name, block.segment_index, block.block_count, block.segment_byte_length, block.block_size) != identity or block.block_index != i:
+            raise ValueError("duplicate index or inconsistent block identity")
+        expected = min(size, length-i*size)
+        if len(block.payload) not in {expected, size} or any(block.payload[expected:]):
+            raise ValueError("invalid block length or nonzero padding")
+        output.append(block.payload[:expected])
+    return b"".join(output)

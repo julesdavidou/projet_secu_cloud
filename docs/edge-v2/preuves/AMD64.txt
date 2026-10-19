@@ -1,0 +1,69 @@
+Validation locale 2026-10-19. Les fichiers media des smokes sont reels. Matériel physique NON TESTE. CI distante distincte.
+
+SOURCE: smoke-final.log
+PASS Java login and session-required API
+PASS wrong password denied (colleague HTTP-200 failure contract preserved)
+PASS colleague HLS segmentation -> Go scheduler -> real Edge upload READY
+PASS SQLite READY catalogue, real SHA256 receipts, private ownership isolation
+PASS original MP4 reconstructed on Edge: exact source bytes/SHA256, private download isolated
+PASS Edge block reconstruction, exact native MP4, decode video+audio, HTTP Range206
+PASS profiles, favorites, resume, user isolation, cross-origin mutation denial
+PASS invalid media never published READY
+PASS explicitly shared video readable by another signed-in account only
+PASS unchanged spectator frontend served with runtime API configuration
+PASS logout revokes session, stable client ID on relogin
+
+SOURCE: network-final.log
+PASS MQTT3 A / MQTT5 B status commands and business ACK; destructive bypass refused
+PASS real scoped read grants; anonymous, expired, wrong-object and write reuse refused
+PASS real variable blocks span A/B, idempotent Go plan, Edge reconstruction cmp/source SHA256
+PASS logical node mobility A->B through brokers, unchanged object placement and exact reconstruction
+PASS temporary capacity reservation cancelled; no fake completion, no stored file deleted
+PASS broker ACL: Edge cannot impersonate admin (PUBACK reason 135)
+
+SOURCE: resilience-final.log
+PASS stable Java identity before restart
+PASS central SQLite lookup remains READY
+PASS actual disk SHA256 A1/0
+PASS actual disk SHA256 A1/1
+PASS actual disk SHA256 A1/2
+PASS actual disk SHA256 A1/3
+PASS actual disk SHA256 B1/4
+PASS actual disk SHA256 B1/5
+PASS actual disk SHA256 B1/6
+PASS actual disk SHA256 B1/7
+PASS actual disk SHA256 B1/8
+PASS actual disk SHA256 B1/9
+PASS actual disk SHA256 B1/10
+PASS actual disk SHA256 B1/11
+PASS actual disk SHA256 B1/12
+PASS actual disk SHA256 B1/13
+PASS actual disk SHA256 B1/14
+PASS actual disk SHA256 B1/15
+PASS /api/videos/v-7ff5186b86dcaecbac0883449dc414e7/original rejected HTTP 502
+PASS /api/videos/v-7ff5186b86dcaecbac0883449dc414e7/playback rejected HTTP 502
+PASS /media/v-7ff5186b86dcaecbac0883449dc414e7/video.mp4 rejected HTTP 409
+PASS fixture restored exactly after corruption test
+PASS /api/videos/v-7ff5186b86dcaecbac0883449dc414e7/original rejected HTTP 502
+PASS exact original after missing/corrupt block restoration
+PASS offline broker gives no fabricated business ACK
+PASS MQTT3 re-subscription and business ACK after broker restart
+PASS no duplicated quota after reconnect
+PASS /api/videos rejected HTTP 401
+PASS persisted credentials and stable ID after auth restart
+PASS owner identity persisted across restart
+PASS catalogue and ownership persisted across restart
+PASS Edge files reread and playback reverified after restart
+PASS real missing/corrupt blocks refused and restored, broker reconnect, durable restart. Physical lab NOT_TESTED.
+
+SOURCE: compat.log
+PASS Java login and session-required API
+PASS wrong password denied (colleague HTTP-200 failure contract preserved)
+PASS colleague HLS segmentation -> Go scheduler -> real Edge upload READY
+PASS SQLite READY catalogue, real SHA256 receipts, private ownership isolation
+PASS download Edge segments, verify SHA256, remux MP4, decode video+audio, HTTP Range206
+PASS profiles, favorites, resume, user isolation, cross-origin mutation denial
+PASS invalid media never published READY
+PASS explicitly shared video readable by another signed-in account only
+PASS unchanged spectator frontend served with runtime API configuration
+PASS logout revokes session, stable client ID on relogin

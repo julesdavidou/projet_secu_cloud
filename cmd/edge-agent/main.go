@@ -12,9 +12,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/julesdavidou/projet_secu_cloud/internal/edgecontrol"
 	"github.com/julesdavidou/projet_secu_cloud/internal/monitor"
 	"github.com/julesdavidou/projet_secu_cloud/internal/mqttclient"
 	"github.com/julesdavidou/projet_secu_cloud/internal/storage"
+	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 )
 
 type Config struct {
@@ -37,7 +39,7 @@ func getEnv(name string, defaultValue string) string {
 
 func loadConfig() Config {
 	interval, err := time.ParseDuration(getEnv("HEARTBEAT_INTERVAL", "5s"))
-	if err != nil {
+	if err != nil || interval <= 0 {
 		log.Fatalf("invalid heartbeat interval: %v", err)
 	}
 
@@ -86,7 +88,8 @@ func main() {
 
 	var mqttClient *mqttclient.Client
 
-	if config.MQTTBroker != "" {
+	managed := os.Getenv("EDGE_CONTROL_ENABLED") == "1"
+	if config.MQTTBroker != "" && !managed {
 		mqttClient = mqttclient.New(
 			config.MQTTBroker,
 			config.EdgeID,
@@ -95,6 +98,9 @@ func main() {
 			config.MQTTPassword,
 			config.StorageRoot,
 			func(tenant, object string) error {
+				if os.Getenv("MQTT_ALLOW_DELETE") != "1" || tenant == "project" {
+					return errors.New("managed deletion requires authoritative catalogue coordination")
+				}
 				return store.Delete(tenant, object)
 			},
 		)
@@ -112,10 +118,23 @@ func main() {
 				}
 			}
 		}()
-	} else {
+	} else if !managed {
 		log.Println("MQTT_BROKER not configured: MQTT disabled")
 	}
 
+	if managed {
+		cfg, e := controllers.LoadConfig(controllers.Env("CONTROLLERS_CONFIG", "/config/config.json"))
+		if e != nil {
+			log.Fatal(e)
+		}
+		go func() {
+			if e := edgecontrol.Run(ctx, cfg); e != nil && ctx.Err() == nil {
+				log.Printf("managed Edge control stopped: %v", e)
+				stop()
+			}
+		}()
+		log.Print("managed MQTT control enabled; standalone telemetry publisher disabled")
+	}
 	mux := http.NewServeMux()
 	registerVerifiedRoutes(mux, store)
 
@@ -188,6 +207,10 @@ func main() {
 		tenant := r.PathValue("tenant")
 		object := r.PathValue("object")
 
+		if managed && tenant == "project" {
+			http.Error(w, "managed deletion requires catalogue coordination", 409)
+			return
+		}
 		err := store.Delete(tenant, object)
 		if errors.Is(err, storage.ErrInvalidID) {
 			http.Error(w, "invalid identifier", http.StatusBadRequest)

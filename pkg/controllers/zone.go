@@ -198,7 +198,9 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			saved := z.Checkpoint().Reservations[q.ID]
 			for _, a := range saved.Plan {
-				_ = RPC(opctx, b, "edge-"+a.NodeID, "RELEASE", q, nil)
+				if e := RPC(opctx, b, "edge-"+a.NodeID, "RELEASE", q, nil); e != nil {
+					return nil, e
+				}
 			}
 			e := z.Release(q.ID)
 			mark()

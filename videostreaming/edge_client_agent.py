@@ -14,7 +14,7 @@ Variables d'environnement :
   PLACEMENT_URL    URL d'un placement.json (ex: servi par la passerelle/MQTT bridge)
   PINNED_PK_S      chemin d'un JSON {"owner_id","PK_s"} reçu par un canal de confiance.
                    Sans lui, la vérification prouve l'intégrité mais PAS l'authenticité
-                   (le stockage pourrait fournir sa propre clé). Fortement recommandé.
+                   (le stockage pourrait fournir sa propre clé). Obligatoire si VERIFY=1.
   VERIFY           1 (défaut) / 0 pour désactiver (debug uniquement)
   WORKERS          processus de vérification (défaut : nb de CPU)
   PREFETCH         segments préchargés en avance (défaut 2)
@@ -31,7 +31,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import PlainTextResponse, Response
 
 from blocks import BlockEnvelope, reassemble_segment
@@ -48,6 +48,8 @@ PREFETCH = int(os.environ.get("PREFETCH", "2"))
 CACHE_SEGMENTS = int(os.environ.get("CACHE_SEGMENTS", "16"))
 
 app = FastAPI(title="SecuCloud edge client agent")
+from reconstruction_contract import reconstruction_endpoint
+app.add_api_route("/v2/reconstruct", reconstruction_endpoint, methods=["POST"])
 _pool: ProcessPoolExecutor | None = None
 _cache: "OrderedDict[tuple, bytes]" = OrderedDict()
 _inflight: dict[tuple, asyncio.Future] = {}
@@ -76,8 +78,10 @@ def check_trust(data: dict) -> None:
     """Le placement vient du stockage/réseau : on ne lui fait confiance que si la clé publique
     et l'owner correspondent à ce qui a été épinglé par un canal de confiance."""
     global _pinned
-    if not VERIFY or not PINNED_PK_S:
+    if not VERIFY:
         return
+    if not PINNED_PK_S:
+        raise HTTPException(503,"trusted SIS/IBS anchor required; no authenticity claim without it")
     if _pinned is None:
         _pinned = json.loads(Path(PINNED_PK_S).read_text())
     sec = data.get("security") or {}
@@ -90,6 +94,7 @@ async def fetch_blocks(client: httpx.AsyncClient, node: str, owner: str, video_i
     r = await client.get(f"{base}/{object_name(video_id, seg, 'block_0000.json')}")
     r.raise_for_status()
     count = r.json()["block_count"]
+    if type(count) is not int or not 1 <= count <= 512:raise HTTPException(502,"invalid block count")
 
     async def one(i: int) -> BlockEnvelope:
         idx = f"block_{i:04d}"
@@ -103,7 +108,7 @@ async def fetch_blocks(client: httpx.AsyncClient, node: str, owner: str, video_i
         return BlockEnvelope(
             video_id=m["video_id"], segment_name=m["segment_name"], segment_index=m["segment_index"],
             block_index=m["block_index"], block_count=m["block_count"],
-            segment_byte_length=m["segment_byte_length"], payload=bb.content,
+            segment_byte_length=m["segment_byte_length"], payload=bb.content, block_size=m.get("block_size",125000),
         )
 
     return list(await asyncio.gather(*(one(i) for i in range(count))))
@@ -131,11 +136,14 @@ async def build_segment(data: dict, video_id: str, seg: str) -> bytes:
         print(f"[verify] {seg}: {'OK' if ok else 'ECHEC'} en {time.time() - t0:.1f}s" + (f" blocs fautifs={bad}" if bad else ""))
         if not ok:
             raise HTTPException(502, f"{seg}: vérification d'intégrité/authenticité ÉCHOUÉE" + (f" (blocs {bad})" if bad else ""))
-    return reassemble_segment(blocks)
+    try:
+        return reassemble_segment(blocks)
+    except ValueError as exc:
+        raise HTTPException(502, "contrat des blocs invalide") from exc
 
 
 async def get_segment(data: dict, video_id: str, seg: str) -> bytes:
-    key = (video_id, seg)
+    key = (video_id, seg, json.dumps(data,sort_keys=True,separators=(",",":")))
     if key in _cache:
         _cache.move_to_end(key)
         return _cache[key]

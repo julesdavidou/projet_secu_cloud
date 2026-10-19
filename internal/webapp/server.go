@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
+	"github.com/julesdavidou/projet_secu_cloud/pkg/media"
 	"github.com/julesdavidou/projet_secu_cloud/pkg/placement"
 )
 
@@ -30,22 +31,26 @@ type Config struct {
 	CentralURL, AuthURL, SecretsDir, DataDir, StaticDir, ConsoleDir, VideoScript, SourceNodeID string
 	MaxUpload                                                                                  int64
 	NodeTTL                                                                                    time.Duration
+	BlockPipeline                                                                              bool
 }
 type MediaFile struct {
 	Name     string `json:"name"`
 	ExtentID uint64 `json:"extent_id"`
 }
 type Movie struct {
-	ID          string      `json:"id"`
-	Owner       string      `json:"owner"`
-	Title       string      `json:"title"`
-	Category    string      `json:"category"`
-	Description string      `json:"description"`
-	Public      bool        `json:"public"`
-	PublishedAt string      `json:"publishedAt"`
-	Duration    float64     `json:"duration"`
-	Playlist    string      `json:"playlist"`
-	Files       []MediaFile `json:"files"`
+	ID            string        `json:"id"`
+	LayoutVersion int           `json:"layout_version,omitempty"`
+	Assets        []media.Asset `json:"assets,omitempty"`
+	NativeSource  bool          `json:"native_source,omitempty"`
+	Owner         string        `json:"owner"`
+	Title         string        `json:"title"`
+	Category      string        `json:"category"`
+	Description   string        `json:"description"`
+	Public        bool          `json:"public"`
+	PublishedAt   string        `json:"publishedAt"`
+	Duration      float64       `json:"duration"`
+	Playlist      string        `json:"playlist"`
+	Files         []MediaFile   `json:"files"`
 }
 type History struct {
 	VideoID   string  `json:"videoId"`
@@ -191,6 +196,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/videos", s.list)
 	api.HandleFunc("POST /api/videos", s.upload)
 	api.HandleFunc("GET /api/videos/{id}/playback", s.playback)
+	api.HandleFunc("GET /api/videos/{id}/original", s.original)
 	api.HandleFunc("GET /api/videos/{id}/placement", s.placement)
 	api.HandleFunc("GET /api/me", s.profile)
 	api.HandleFunc("PATCH /api/me", s.profile)
@@ -503,9 +509,18 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid or oversized upload", 413)
 		return
 	}
+	random := make([]byte, 16)
+	if _, e = rand.Read(random); e != nil {
+		http.Error(w, "identity unavailable", 503)
+		return
+	}
+	id := "v-" + hex.EncodeToString(random)
 	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "python3", s.cfg.VideoScript, input, filepath.Join(dir, "hls"))
+	if s.cfg.BlockPipeline {
+		cmd.Env = append(os.Environ(), "VIDEO_BLOCK_PIPELINE=1", "VIDEO_ID="+id, "VIDEO_OWNER_ID="+uid(r))
+	}
 	output, e := cmd.CombinedOutput()
 	if e != nil {
 		log.Printf("segmentation failed: %s", output)
@@ -513,22 +528,19 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var pack struct {
-		Duration float64  `json:"duration"`
-		Playlist string   `json:"playlist"`
-		Files    []string `json:"files"`
+		Version      int           `json:"version"`
+		Assets       []media.Asset `json:"assets"`
+		NativeSource bool          `json:"native_source"`
+		Duration     float64       `json:"duration"`
+		Playlist     string        `json:"playlist"`
+		Files        []string      `json:"files"`
 	}
 	raw, e := os.ReadFile(filepath.Join(dir, "hls", "package.json"))
 	if e != nil || json.Unmarshal(raw, &pack) != nil || len(pack.Files) == 0 || len(pack.Files) > 512 {
 		http.Error(w, "invalid video package", 502)
 		return
 	}
-	random := make([]byte, 16)
-	if _, e = rand.Read(random); e != nil {
-		http.Error(w, "identity unavailable", 503)
-		return
-	}
-	id := "v-" + hex.EncodeToString(random)
-	movie := Movie{ID: id, Owner: uid(r), Title: title, Category: category, Public: r.URL.Query().Get("public") == "true", PublishedAt: time.Now().UTC().Format(time.RFC3339Nano), Duration: pack.Duration, Playlist: pack.Playlist}
+	movie := Movie{LayoutVersion: pack.Version, Assets: pack.Assets, NativeSource: pack.NativeSource, ID: id, Owner: uid(r), Title: title, Category: category, Public: r.URL.Query().Get("public") == "true", PublishedAt: time.Now().UTC().Format(time.RFC3339Nano), Duration: pack.Duration, Playlist: pack.Playlist}
 	upload := controllers.Upload{Manifest: placement.Manifest{RequestID: id, VideoID: id, SourceNodeID: s.cfg.SourceNodeID}, Target: 1}
 	var total int64
 	for i, name := range pack.Files {
@@ -542,7 +554,11 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		total += int64(len(raw))
-		if total > s.cfg.MaxUpload*2 {
+		limit := s.cfg.MaxUpload * 2
+		if pack.Version == 2 {
+			limit = s.cfg.MaxUpload * 3
+		}
+		if total > limit {
 			http.Error(w, "generated media exceeds limit", 413)
 			return
 		}
@@ -550,6 +566,12 @@ func (s *Server) upload(w http.ResponseWriter, r *http.Request) {
 		upload.Manifest.Segments = append(upload.Manifest.Segments, placement.Segment{ID: uint64(i), Size: uint64(len(raw))})
 		upload.Contents = append(upload.Contents, controllers.Content{ExtentID: uint64(i), SHA256: hex.EncodeToString(hash[:])})
 		movie.Files = append(movie.Files, MediaFile{Name: name, ExtentID: uint64(i)})
+	}
+	if pack.Version == 2 {
+		if e := validateAssets(movie, upload); e != nil {
+			http.Error(w, "invalid block package mapping", 502)
+			return
+		}
 	}
 	upload.Manifest.Total = uint64(total)
 	s.mu.Lock()
@@ -631,34 +653,53 @@ func (s *Server) preparePlayback(ctx context.Context, m Movie, v controllers.Upl
 	if len(v.Units) != len(m.Files) {
 		return errors.New("incomplete media mapping")
 	}
-	var total uint64
-	for _, u := range v.Units {
-		if u.ID >= uint64(len(m.Files)) || m.Files[u.ID].ExtentID != u.ID {
-			return errors.New("unexpected extent")
+	if m.LayoutVersion == 2 {
+		for _, asset := range m.Assets {
+			if m.NativeSource && asset.Name != "original.mp4" || !m.NativeSource && asset.Name == "original.mp4" {
+				continue
+			}
+			if e = s.fetchAsset(ctx, m, v, asset, filepath.Join(dir, asset.Name)); e != nil {
+				return e
+			}
 		}
-		total += u.Size
-		if total > uint64(s.cfg.MaxUpload*2) {
-			return errors.New("media read limit")
+		if m.NativeSource {
+			final := filepath.Join(s.cfg.DataDir, "cache", m.ID+".mp4")
+			if e = os.Rename(filepath.Join(dir, "original.mp4"), final); e != nil {
+				return e
+			}
+			s.verified[m.ID] = final
+			return nil
 		}
-		res, e := s.edge(ctx, u, "GET", nil)
-		if e != nil {
-			return e
-		}
-		if res.StatusCode != 200 {
+	} else {
+		var total uint64
+		for _, u := range v.Units {
+			if u.ID >= uint64(len(m.Files)) || m.Files[u.ID].ExtentID != u.ID {
+				return errors.New("unexpected extent")
+			}
+			total += u.Size
+			if total > uint64(s.cfg.MaxUpload*2) {
+				return errors.New("media read limit")
+			}
+			res, e := s.edge(ctx, u, "GET", nil)
+			if e != nil {
+				return e
+			}
+			if res.StatusCode != 200 {
+				res.Body.Close()
+				return errors.New("stored media unavailable")
+			}
+			f, e := os.Create(filepath.Join(dir, m.Files[u.ID].Name))
+			if e != nil {
+				res.Body.Close()
+				return e
+			}
+			h := sha256.New()
+			size, e := io.Copy(io.MultiWriter(f, h), io.LimitReader(res.Body, int64(u.Size)+1))
+			f.Close()
 			res.Body.Close()
-			return errors.New("stored media unavailable")
-		}
-		f, e := os.Create(filepath.Join(dir, m.Files[u.ID].Name))
-		if e != nil {
-			res.Body.Close()
-			return e
-		}
-		h := sha256.New()
-		size, e := io.Copy(io.MultiWriter(f, h), io.LimitReader(res.Body, int64(u.Size)+1))
-		f.Close()
-		res.Body.Close()
-		if e != nil || uint64(size) != u.Size || hex.EncodeToString(h.Sum(nil)) != u.SHA256 {
-			return errors.New("stored unit size/SHA256 mismatch")
+			if e != nil || uint64(size) != u.Size || hex.EncodeToString(h.Sum(nil)) != u.SHA256 {
+				return errors.New("stored unit size/SHA256 mismatch")
+			}
 		}
 	}
 	if e = os.WriteFile(filepath.Join(dir, "index.m3u8"), []byte(m.Playlist), 0600); e != nil {

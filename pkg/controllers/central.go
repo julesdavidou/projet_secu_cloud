@@ -389,6 +389,7 @@ func RunCentral(ctx context.Context, cfg Config) error {
 	ready.Store(true)
 	go func() {
 		committed := map[string]bool{}
+		released := map[string]bool{}
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
 		for {
@@ -400,8 +401,16 @@ func RunCentral(ctx context.Context, cfg Config) error {
 				ready.Store(e == nil)
 				c.mu.Lock()
 				pending := map[string]string{}
+				cancelled := map[string]string{}
 				for id, u := range c.state.Uploads {
 					record, err := c.record(id, u)
+					if err == nil && record.State == "FAILED" {
+						for zone, res := range u.Plan.Reservations {
+							if !released[res] {
+								cancelled[res] = zone
+							}
+						}
+					}
 					if err == nil && record.State == "READY" {
 						for zone, res := range u.Plan.Reservations {
 							if !committed[res] {
@@ -411,6 +420,13 @@ func RunCentral(ctx context.Context, cfg Config) error {
 					}
 				}
 				c.mu.Unlock()
+				// Retry after broker outages and process restarts. RELEASE only
+				// releases reservations; stored bytes and their quota stay intact.
+				for res, zone := range cancelled {
+					if RPC(ctx, b, "zone-"+zone, "RELEASE", Key{res}, nil) == nil {
+						released[res] = true
+					}
+				}
 				for res, zone := range pending {
 					if RPC(ctx, b, "zone-"+zone, "COMMIT", Key{res}, nil) == nil {
 						committed[res] = true

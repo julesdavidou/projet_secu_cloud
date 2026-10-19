@@ -95,3 +95,7 @@ npm run dev
 ```
 
 Ouvrir http://127.0.0.1:5173/ ; aucune installation de dépendances n'est nécessaire. `npm test` lance les tests du frontend. La procédure complète et le contrat proposé pour la future API web Go sont dans [frontend/README.md](frontend/README.md).
+
+## Intégration Edge MQTT et reconstruction V2
+
+Banc isolé avec vrais brokers Edge, MQTT3/5, stockage et reconstruction sur Edge : [guide PowerShell](docs/edge-v2/DEMARRAGE.md), [livraison et limites](docs/edge-v2/LIVRAISON.md), [matrice des contrats](docs/edge-v2/CONTRATS-ET-CONFLITS.md).

@@ -27,7 +27,6 @@ from pathlib import Path
 
 import httpx
 
-from placement import choose_nodes_for_segments
 
 try:
     import paho.mqtt.publish as mqtt_publish
@@ -63,6 +62,10 @@ def send_blocks_distributed(
         print(f"Aucun dossier de segment trouvé dans {blocks_dir}")
         return {}
 
+    try:
+        from placement import choose_nodes_for_segments
+    except ImportError as error:
+        raise RuntimeError("legacy sender requires placement.py; integrated publication must use the authoritative Go API") from error
     segment_names = [d.name for d in seg_dirs]
     placement = choose_nodes_for_segments(video_id, segment_names, node_urls, strategy=strategy)
 

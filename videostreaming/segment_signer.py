@@ -16,15 +16,16 @@ pairings). Sur ARM (Jetson/Raspberry) compter plusieurs fois plus.
 from __future__ import annotations
 
 import random
+import json
 
 from crypto_serialize import deserialize_g2, deserialize_sigma, serialize_g2, serialize_sigma
 from IBSSignature import IBSSignature
 from SISIntegrity import SecurityParams, SISIntegrity, SISParams
 
 
-def signed_value(video_id: str, segment_name: str, V: list) -> list:
+def signed_value(video_id: str, segment_name: str, V: list, context: dict | None = None) -> list:
     """Valeur passée à generate_signature / verify_signature à la place de V."""
-    return [video_id, segment_name, V]
+    return [video_id, segment_name, V] if context is None else ["caribou-sis-context-v2", video_id, segment_name, json.dumps(context,sort_keys=True,separators=(",",":")), V]
 
 
 class SegmentSigner:
@@ -59,24 +60,27 @@ class SegmentSigner:
         """Ce que le client doit recevoir par un canal de confiance (pas depuis le stockage)."""
         return {"owner_id": self.owner_id, "PK_s": serialize_g2(self.PK_s)}
 
-    def sign_segment(self, video_id: str, segment_name: str, payloads: list[bytes], include_v: bool = False) -> dict:
+    def sign_segment(self, video_id: str, segment_name: str, payloads: list[bytes], include_v: bool = False, context: dict | None = None) -> dict:
         X = self.sis.build_data_matrix(payloads)
         V = self.sis.compute_V(self.A, X)
-        sigma = self.ibs.generate_signature(signed_value(video_id, segment_name, V), self.sis_params, self.S_w)
+        sigma = self.ibs.generate_signature(signed_value(video_id, segment_name, V, context), self.sis_params, self.S_w)
         entry = {"sigma": serialize_sigma(sigma)}
+        if context is not None:entry.update({"version":2,"context":context})
         if include_v:  # utile pour localiser un bloc altéré, mais volumineux (l entiers par bloc)
             entry["V"] = V
         return entry
 
 
 def verify_segment(
-    security: dict, entry: dict, video_id: str, segment_name: str, payloads: list[bytes]
+    security: dict, entry: dict, video_id: str, segment_name: str, payloads: list[bytes], expected_context: dict | None = None
 ) -> tuple[bool, list[int]]:
     """Fonction de niveau module (picklable) : exécutable dans un ProcessPoolExecutor.
 
     Retourne (ok, blocs_en_défaut). blocs_en_défaut n'est rempli que si la
     vérification échoue ET que V a été stocké dans `entry`.
     """
+    if expected_context is not None and (entry.get("version")!=2 or entry.get("context")!=expected_context):
+        return False, []
     sis = SISIntegrity(SecurityParams(**security["sec_params"]))
     sis_params = SISParams(**security["sis_params"])
     A = sis.reconstruct_A(sis_params)
@@ -88,7 +92,7 @@ def verify_segment(
         None,
         deserialize_g2(security["PK_s"]),
         deserialize_sigma(entry["sigma"]),
-        signed_value(video_id, segment_name, V_prime),
+        signed_value(video_id, segment_name, V_prime, entry.get("context")),
         sis_params,
     )
 
