@@ -164,6 +164,7 @@ Sur Jetson, utiliser `JETSON1`, `zone-B:19692` et les chemins correspondants. Le
 | Vérification | Nature |
 |---|---|
 | Compilation, tests Go, race, vet dans les trois modules | Exécution Linux AMD64 dans Docker ; App Control Windows empêche les exécutables de test Go natifs |
+| Compatibilité Python du banc V2 | 17 tests depuis un montage en lecture seule, exécutés sans privilèges ; import des services sans création implicite de `/data` |
 | Crypto, contexte, sous-clé et terme de couplage délégué | Vraie bibliothèque `py_ecc`, vrais tirages et calculs ; pas un mock cryptographique |
 | Transactions CAS/révocation SQLite | Vrai SQLite ; double explicite du résultat de vérification dans le test unitaire |
 | Contrat de bridge/export | Fixtures explicites, fausses chaînes de certificat ; teste la sélection des rôles exportés, pas le matériel |

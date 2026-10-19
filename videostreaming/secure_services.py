@@ -12,7 +12,7 @@ from secure_sis import *
 from blocks import pad_block
 from keyed_lock import serialized
 
-DATA=Path(os.environ.get('SECURITY_DATA','/data'));DATA.mkdir(exist_ok=True,parents=True)
+DATA=Path(os.environ.get('SECURITY_DATA','/data'))
 ROLE=os.environ.get('SECURITY_ROLE','authority');ZONE=os.environ.get('ZONE_ID','A')
 LOCK=threading.RLock();SESSIONS={};MAX_BODY=64*1024*1024
 
@@ -314,6 +314,7 @@ el('delegateButton').onclick=()=>action('/owner/delegate',{video_id:el('root').v
 </script></body></html>"""
 
 def main():
+ DATA.mkdir(exist_ok=True,parents=True)
  if ROLE=='authority':authority_key()
  context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.minimum_version=ssl.TLSVersion.TLSv1_3;context.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);context.load_verify_locations(os.environ['TLS_CA_FILE']);context.verify_mode=ssl.CERT_REQUIRED
  server=http.server.ThreadingHTTPServer(('0.0.0.0',8443),Handler);server.socket=context.wrap_socket(server.socket,server_side=True)

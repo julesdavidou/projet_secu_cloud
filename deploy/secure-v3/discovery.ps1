@@ -1,5 +1,6 @@
 param([switch]$WithVod)
 $ErrorActionPreference='Stop'
+New-Item -ItemType Directory -Force "$PSScriptRoot/results"|Out-Null
 if(-not (Get-Command docker -ErrorAction SilentlyContinue)){$env:PATH="${env:LOCALAPPDATA}/Programs/DockerDesktop/resources/bin;"+$env:PATH}
 function D {& docker @args;if($LASTEXITCODE -ne 0){throw "Docker failed ($LASTEXITCODE)"}}
 function IPOf([string]$name){$v=(& docker inspect --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $name).Trim();if($LASTEXITCODE -ne 0 -or $v -notmatch '^\d+\.\d+\.\d+\.\d+$'){throw "Missing bridge IP: $name"};return $v}
