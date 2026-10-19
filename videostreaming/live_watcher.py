@@ -22,34 +22,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import random
-import re
 import time
 from pathlib import Path
 
 import httpx
 
 from blocks import BLOCK_SIZE, segment_to_blocks
-from crypto_serialize import serialize_g2, serialize_sigma
+from hls_utils import parse_manifest
+from segment_signer import SegmentSigner
 from placement import choose_nodes_for_segments
 from sendBlocks import object_name
-from SISIntegrity import SecurityParams, SISIntegrity, SISParams
-from IBSSignature import IBSSignature
-
-SEGMENT_RE = re.compile(r'^(?!#)(\S+\.m4s)\s*$', re.MULTILINE)
-MAP_RE = re.compile(r'#EXT-X-MAP:URI="([^"]+)"')
-TARGETDURATION_RE = re.compile(r'#EXT-X-TARGETDURATION:(\d+)')
-
-
-def parse_manifest(text: str) -> tuple[str | None, list[str], int]:
-    """Retourne (init_segment, liste des segments dans l'ordre, target_duration)."""
-    init_match = MAP_RE.search(text)
-    init_segment = init_match.group(1) if init_match else None
-    segments = SEGMENT_RE.findall(text)
-    td_match = TARGETDURATION_RE.search(text)
-    target_duration = int(td_match.group(1)) if td_match else 4
-    return init_segment, segments, target_duration
-
 
 def load_state(state_path: Path, video_id: str, owner_id: str) -> dict:
     if state_path.is_file():
@@ -73,49 +55,9 @@ def save_state_atomic(state_path: Path, state: dict) -> None:
     tmp.replace(state_path)  # écriture atomique : le gateway ne voit jamais un fichier à moitié écrit
 
 
-class LiveSigner:
-    """Clés IBS + matrice SIS générées une fois, réutilisées pour tout le live."""
-
-    def __init__(self, owner_id: str):
-        self.owner_id = owner_id
-        self.sec_params = SecurityParams()
-        self.sis = SISIntegrity(self.sec_params)
-        self.sis_params = SISParams(
-            I0=random.randrange(1, self.sec_params.q),
-            a=random.randrange(1, self.sec_params.q),
-            C0=random.randrange(1, self.sec_params.q),
-        )
-        self.A = self.sis.generate_matrix_A(self.sis_params)  # coûteux une fois, réutilisé ensuite
-
-        ibs = IBSSignature()
-        self.ibs = ibs
-        t_s, self.PK_s = ibs.setup_zone_keys()
-        S_w_share = ibs.issue_secret_share(t_s, owner_id)
-        self.S_w = ibs.compute_owner_key(None, S_w_share)
-
-    def security_header(self) -> dict:
-        """À écrire une fois dans l'état live (sis_params + PK_s publics)."""
-        return {
-            "sec_params": {
-                "l": self.sec_params.l, "m": self.sec_params.m,
-                "q": self.sec_params.q, "lambda_bits": self.sec_params.lambda_bits,
-            },
-            "sis_params": {"I0": self.sis_params.I0, "a": self.sis_params.a, "C0": self.sis_params.C0},
-            "owner_id": self.owner_id,
-            "PK_s": serialize_g2(self.PK_s),
-        }
-
-    def sign_segment(self, payloads: list[bytes]) -> dict:
-        """Calcule V et sigma pour les blocs d'UN segment."""
-        X = self.sis.build_data_matrix(payloads)
-        V = self.sis.compute_V(self.A, X)
-        sigma = self.ibs.generate_signature(V, self.sis_params, self.S_w)
-        return {"V": V, "sigma": serialize_sigma(sigma)}
-
-
 def send_one_segment(
     hls_dir: Path, segment_name: str, video_id: str, owner_id: str,
-    node_urls: list[str], signer: LiveSigner,
+    node_urls: list[str], signer: SegmentSigner,
 ) -> tuple[str, dict]:
     """Découpe, signe, place et envoie un seul segment.
     Retourne (nœud choisi, signature {"V":..., "sigma":...})."""
@@ -123,7 +65,7 @@ def send_one_segment(
     env_blocks = segment_to_blocks(video_id, segment_name, 0, data, block_size=BLOCK_SIZE)
     payloads = [b.payload for b in env_blocks]
 
-    signature = signer.sign_segment(payloads)
+    signature = signer.sign_segment(video_id, segment_name, payloads, include_v=True)
     node_url = choose_nodes_for_segments(video_id, [segment_name], node_urls, strategy="round_robin")[segment_name]
 
     with httpx.Client(timeout=30) as client:
@@ -152,7 +94,7 @@ def watch(
     known = set(state["segments"])
 
     print("génération des clés IBS et de la matrice SIS (une fois pour tout le live)...")
-    signer = LiveSigner(owner_id)
+    signer = SegmentSigner(owner_id)
     if state["security"] is None:
         state["security"] = signer.security_header()
         save_state_atomic(state_path, state)
