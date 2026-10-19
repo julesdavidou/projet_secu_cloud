@@ -10,7 +10,9 @@ def segment_video(input_file, output_dir, segment_time=4):
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Définition des chemins complets vers le dossier de sortie
-    init_filename = str(out_dir / "init.mp4")
+    # FFmpeg resolves this option relative to the playlist directory. An
+    # absolute path is prefixed again by the HLS muxer and fails on Linux.
+    init_filename = "init.mp4"
     segment_filename = str(out_dir / "seg_%05d.m4s")
     playlist_path = str(out_dir / "index.m3u8")
 

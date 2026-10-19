@@ -1,0 +1,67 @@
+ caribou-integration-web-1 Copying C:\Users\cyril\Documents\Codex\2026-10-13\je-te-confie-l-impl-mentation\work\repo\deploy\integration/smoke.py to caribou-integration-web-1:/tmp/integration-smoke.py
+ caribou-integration-web-1 Copied C:\Users\cyril\Documents\Codex\2026-10-13\je-te-confie-l-impl-mentation\work\repo\deploy\integration/smoke.py to caribou-integration-web-1:/tmp/integration-smoke.py
+PASS Java login and session-required API
+PASS wrong password denied (colleague HTTP-200 failure contract preserved)
+PASS colleague HLS segmentation -> Go scheduler -> real Edge upload READY
+PASS SQLite READY catalogue, real SHA256 receipts, private ownership isolation
+PASS download Edge segments, verify SHA256, remux MP4, decode video+audio, HTTP Range206
+PASS profiles, favorites, resume, user isolation, cross-origin mutation denial
+PASS invalid media never published READY
+PASS explicitly shared video readable by another signed-in account only
+PASS unchanged spectator frontend served with runtime API configuration
+PASS logout revokes session, stable client ID on relogin
+{
+  "run": "smoke-f4244ab478b94defb1c71d2ab26dc1f9",
+  "video_id": "v-991dd11ef3fb8c50569e0c17d84d92ee",
+  "owner": "client-56e82cfa-9224-4d72-94a2-68cc22c5f854",
+  "checks": [
+    "Java login and session-required API",
+    "wrong password denied (colleague HTTP-200 failure contract preserved)",
+    "colleague HLS segmentation -> Go scheduler -> real Edge upload READY",
+    "SQLite READY catalogue, real SHA256 receipts, private ownership isolation",
+    "download Edge segments, verify SHA256, remux MP4, decode video+audio, HTTP Range206",
+    "profiles, favorites, resume, user isolation, cross-origin mutation denial",
+    "invalid media never published READY",
+    "explicitly shared video readable by another signed-in account only",
+    "unchanged spectator frontend served with runtime API configuration",
+    "logout revokes session, stable client ID on relogin"
+  ],
+  "placement": {
+    "state": "READY",
+    "units": [
+      {
+        "extent_id": 0,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "4f51ff55692f79aaddd23741f3bff194b15416d28f0aee4e7e115ede5f9c8eaf",
+        "size_bytes": 1355,
+        "state": "STORED",
+        "zone_id": "A"
+      },
+      {
+        "extent_id": 1,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "f9eb4fabc463afe58b89b81483f22857c4b4736ce8cacd91e2622477e2f9a3c1",
+        "size_bytes": 181370,
+        "state": "STORED",
+        "zone_id": "A"
+      },
+      {
+        "extent_id": 2,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "46804c41f11719c1cdc2d0e6e32ccc59f3bae674f9fb73954e49468e5dd174ba",
+        "size_bytes": 85632,
+        "state": "STORED",
+        "zone_id": "A"
+      }
+    ],
+    "video_id": "v-991dd11ef3fb8c50569e0c17d84d92ee"
+  },
+  "playback_bytes": 270187,
+  "playback_sha256": "96df7d6ec6e24727cac29519c7139f239e53ae74ded43887b986e039d1cb8c52",
+  "physical_lab": "NOT_TESTED",
+  "SIS_IBS_live": "NOT_INTEGRATED",
+  "fixture": "synthetic pattern; actual Edge files and decoder"
+}

@@ -1,0 +1,79 @@
+Unable to find image 'node:22-alpine' locally
+22-alpine: Pulling from library/node
+d39db1cf9caa: Pulling fs layer
+f7f2d304681a: Pulling fs layer
+e554276b05e6: Pulling fs layer
+15c907cd5cbc: Download complete
+707399b387b7: Download complete
+d39db1cf9caa: Download complete
+e554276b05e6: Download complete
+f7f2d304681a: Download complete
+e554276b05e6: Pull complete
+f7f2d304681a: Pull complete
+d39db1cf9caa: Pull complete
+Digest: sha256:0a7108bf6c7bf5de370ffb1a3ed6be93d405b43ff159f681a8d18c0e2bc2e402
+Status: Downloaded newer image for node:22-alpine
+TAP version 13
+# Subtest: une recherche accentuée et multi-mots se combine aux filtres sans modifier le catalogue
+ok 1 - une recherche accentuée et multi-mots se combine aux filtres sans modifier le catalogue
+  ---
+  duration_ms: 3.624925
+  type: 'test'
+  ...
+# Subtest: favoris, profil et progression survivent au rechargement ; effacer l’historique préserve les favoris
+ok 2 - favoris, profil et progression survivent au rechargement ; effacer l’historique préserve les favoris
+  ---
+  duration_ms: 1.466475
+  type: 'test'
+  ...
+# Subtest: un stockage local invalide ou interdit ne casse pas les parcours
+ok 3 - un stockage local invalide ou interdit ne casse pas les parcours
+  ---
+  duration_ms: 0.281495
+  type: 'test'
+  ...
+# Subtest: l’adaptateur HTTP transmet les données à l’API avec la session et gère les réponses sans corps
+ok 4 - l’adaptateur HTTP transmet les données à l’API avec la session et gère les réponses sans corps
+  ---
+  duration_ms: 35.784739
+  type: 'test'
+  ...
+# Subtest: un refus d’accès conserve son statut et ne devient pas une fausse réponse de démonstration
+ok 5 - un refus d’accès conserve son statut et ne devient pas une fausse réponse de démonstration
+  ---
+  duration_ms: 2.103325
+  type: 'test'
+  ...
+# Subtest: une requête bloquée est interrompue et présente une erreur exploitable
+ok 6 - une requête bloquée est interrompue et présente une erreur exploitable
+  ---
+  duration_ms: 11.179939
+  type: 'test'
+  ...
+# Subtest: les fragments invalides et les adresses de média exécutables sont rejetés
+ok 7 - les fragments invalides et les adresses de média exécutables sont rejetés
+  ---
+  duration_ms: 0.645904
+  type: 'test'
+  ...
+# Subtest: la version livrée reste vide, même en présence d’anciennes données fictives
+ok 8 - la version livrée reste vide, même en présence d’anciennes données fictives
+  ---
+  duration_ms: 0.637389
+  type: 'test'
+  ...
+# Subtest: le serveur statique sert les modules et les plages vidéo sans exposer les fichiers du dépôt
+ok 9 - le serveur statique sert les modules et les plages vidéo sans exposer les fichiers du dépôt
+  ---
+  duration_ms: 75.447442
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 303.562746

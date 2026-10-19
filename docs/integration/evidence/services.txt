@@ -1,0 +1,11 @@
+NAME                            IMAGE                             COMMAND                  SERVICE   CREATED              STATUS                        PORTS
+caribou-integration-agent-a-1   caribou/integration-control:dev   "edge-agent"             agent-a   5 minutes ago        Up About a minute (healthy)   8088/tcp
+caribou-integration-agent-b-1   caribou/integration-control:dev   "edge-agent"             agent-b   5 minutes ago        Up About a minute (healthy)   8088/tcp
+caribou-integration-auth-1      caribou/integration-auth:dev      "/__cacert_entrypoin…"   auth      5 minutes ago        Up About a minute (healthy)   
+caribou-integration-broker-1    eclipse-mosquitto:2.0.22          "/bin/sh /entrypoint…"   broker    About a minute ago   Up About a minute (healthy)   127.0.0.1:1884->1883/tcp
+caribou-integration-central-1   caribou/integration-control:dev   "central-controller"     central   5 minutes ago        Up About a minute (healthy)   127.0.0.1:19088->8088/tcp
+caribou-integration-edge-a-1    caribou/integration-control:dev   "edge-bridge"            edge-a    5 minutes ago        Up About a minute (healthy)   127.0.0.1:19081->8088/tcp
+caribou-integration-edge-b-1    caribou/integration-control:dev   "edge-bridge"            edge-b    5 minutes ago        Up About a minute (healthy)   127.0.0.1:19082->8088/tcp
+caribou-integration-web-1       caribou/integration-web:dev       "web-api"                web       5 minutes ago        Up About a minute (healthy)   127.0.0.1:18090->8080/tcp
+caribou-integration-zone-a-1    caribou/integration-control:dev   "serveur-zone"           zone-a    5 minutes ago        Up About a minute (healthy)   8088/tcp
+caribou-integration-zone-b-1    caribou/integration-control:dev   "serveur-zone"           zone-b    5 minutes ago        Up About a minute (healthy)   8088/tcp

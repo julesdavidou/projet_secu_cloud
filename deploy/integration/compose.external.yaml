@@ -1,0 +1,11 @@
+# Overlay for existing deploy/lab/compose.edge.yaml on physical hosts.
+# Requires explicit real IP endpoints in the provisioned topology.
+services:
+  edge-a: {profiles: [pc-local]}
+  edge-b: {profiles: [pc-local]}
+  agent-a: {profiles: [pc-local]}
+  agent-b: {profiles: [pc-local]}
+  web:
+    depends_on: !override
+      central: {condition: service_healthy}
+      auth: {condition: service_healthy}

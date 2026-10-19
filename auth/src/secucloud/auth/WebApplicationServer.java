@@ -20,7 +20,8 @@ public final class WebApplicationServer {
 
     public WebApplicationServer(Path webRoot, int port) throws IOException {
         this.webRoot = webRoot.toAbsolutePath().normalize();
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+        server = HttpServer.create(new InetSocketAddress(System.getProperty("web.bind", "127.0.0.1"), port), 0);
+        server.createContext("/health", exchange -> respond(exchange, 200, "{\"status\":\"alive\"}"));
         server.createContext("/api/auth/login", this::login);
         server.createContext("/api/auth/session", this::session);
         server.createContext("/api/auth/logout", this::logout);
@@ -32,7 +33,7 @@ public final class WebApplicationServer {
         int port = Integer.parseInt(System.getProperty("web.port", "8080"));
         WebApplicationServer application = new WebApplicationServer(root, port);
         application.server.start();
-        System.out.println("Application web disponible sur http://127.0.0.1:" + port);
+        System.out.println("Authentication HTTP on " + System.getProperty("web.bind", "127.0.0.1") + ":" + port);
     }
 
     private void login(HttpExchange exchange) throws IOException {
@@ -40,8 +41,8 @@ public final class WebApplicationServer {
             respond(exchange, 405, jsonError("Méthode non autorisée."));
             return;
         }
-        Map<String, String> form = readForm(exchange);
         try {
+            Map<String, String> form = readForm(exchange);
             AuthService.LoginResult result = authService.authenticate(
                     form.get("email"), form.get("password"));
             respondResult(exchange, result);
@@ -114,7 +115,9 @@ public final class WebApplicationServer {
     }
 
     private Map<String, String> readForm(HttpExchange exchange) throws IOException {
-        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        byte[] bytes = exchange.getRequestBody().readNBytes(16385);
+        if (bytes.length > 16384) throw new IllegalArgumentException("Authentication form too large");
+        String body = new String(bytes, StandardCharsets.UTF_8);
         Map<String, String> values = new HashMap<>();
         for (String part : body.split("&")) {
             String[] pair = part.split("=", 2);

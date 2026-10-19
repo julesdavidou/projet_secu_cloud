@@ -1,0 +1,29 @@
+name: Integrated CaribouTV
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  integrated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Go tests, race and vet
+        run: docker build -f deploy/lab/Dockerfile --target verify .
+      - name: Frontend existing tests
+        run: docker run --rm -v "$PWD:/repo:ro" -w /repo/frontend node:22-alpine node --test
+      - name: Validate external Edge overlay
+        run: docker compose -f deploy/integration/compose.yaml -f deploy/integration/compose.external.yaml config --quiet
+      - name: Start isolated real storage integration
+        shell: pwsh
+        run: ./deploy/integration/start.ps1
+      - name: Real Java login, publish, Edge bytes and decoded playback
+        shell: pwsh
+        run: ./deploy/integration/smoke.ps1
+      - name: Logs
+        if: always()
+        run: docker compose -f deploy/integration/compose.yaml logs --no-color --tail 100
+      - name: Stop this disposable CI project
+        if: always()
+        run: docker compose -f deploy/integration/compose.yaml down

@@ -1,0 +1,65 @@
+PASS Java login and session-required API
+PASS wrong password denied (colleague HTTP-200 failure contract preserved)
+PASS colleague HLS segmentation -> Go scheduler -> real Edge upload READY
+PASS SQLite READY catalogue, real SHA256 receipts, private ownership isolation
+PASS download Edge segments, verify SHA256, remux MP4, decode video+audio, HTTP Range206
+PASS profiles, favorites, resume, user isolation, cross-origin mutation denial
+PASS invalid media never published READY
+PASS explicitly shared video readable by another signed-in account only
+PASS unchanged spectator frontend served with runtime API configuration
+PASS logout revokes session, stable client ID on relogin
+{
+  "run": "smoke-a19f0951fb6d440096f65ac2224c5425",
+  "video_id": "v-ca4d4c0b0ab308dbe1776031c87fff54",
+  "owner": "client-988f7fa7-0475-416b-8ac9-a1540b8a4cd4",
+  "checks": [
+    "Java login and session-required API",
+    "wrong password denied (colleague HTTP-200 failure contract preserved)",
+    "colleague HLS segmentation -> Go scheduler -> real Edge upload READY",
+    "SQLite READY catalogue, real SHA256 receipts, private ownership isolation",
+    "download Edge segments, verify SHA256, remux MP4, decode video+audio, HTTP Range206",
+    "profiles, favorites, resume, user isolation, cross-origin mutation denial",
+    "invalid media never published READY",
+    "explicitly shared video readable by another signed-in account only",
+    "unchanged spectator frontend served with runtime API configuration",
+    "logout revokes session, stable client ID on relogin"
+  ],
+  "placement": {
+    "state": "READY",
+    "units": [
+      {
+        "extent_id": 0,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "4f51ff55692f79aaddd23741f3bff194b15416d28f0aee4e7e115ede5f9c8eaf",
+        "size_bytes": 1355,
+        "state": "STORED",
+        "zone_id": "A"
+      },
+      {
+        "extent_id": 1,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "bfa3154c06f860458ae4bfe259e15de889b5ba7efb678bea9fed87e8a3c3e5f4",
+        "size_bytes": 183887,
+        "state": "STORED",
+        "zone_id": "A"
+      },
+      {
+        "extent_id": 2,
+        "node_id": "A1",
+        "proof": "HTTP_SHA256_VERIFIED",
+        "sha256": "c9fbcb504408399b0960fe7e05ef36d463d673ceb2c6258baf5786848ff6aed9",
+        "size_bytes": 88775,
+        "state": "STORED",
+        "zone_id": "A"
+      }
+    ],
+    "video_id": "v-ca4d4c0b0ab308dbe1776031c87fff54"
+  },
+  "playback_bytes": 275839,
+  "playback_sha256": "75daa88b77f6cd0fa933d96918fe0270de3f5fd673ac0a437dd5b8f6c4a52f49",
+  "physical_lab": "NOT_TESTED",
+  "SIS_IBS_live": "NOT_INTEGRATED",
+  "fixture": "synthetic pattern; actual Edge files and decoder"
+}

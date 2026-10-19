@@ -1,0 +1,5 @@
+IMAGE                         ID             DISK USAGE   CONTENT SIZE   EXTRA
+caribou/integration-web:dev   aac34ec4dad3        641MB          174MB   U    
+├─ linux/amd64                dbbf498ceab1        331MB         88.4MB   U    
+└─ linux/arm64                adafd3888910        310MB         86.1MB   U    
+

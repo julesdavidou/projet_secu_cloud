@@ -1,5 +1,7 @@
 # projet_secu_cloud
 
+> **Branche intégrée CaribouTV (19/10)** : [démarrage et tests PC/laboratoire](deploy/integration/README.md), [audit et branches](docs/integration/AUDIT-2026-10-19.md). Le Compose racine décrit ci-dessous reste le déploiement Edge historique ; le nouveau banc complet se lance avec `deploy/integration/start.ps1`.
+
 Projet de développement d'une architecture **Edge Computing distribuée** pour le stockage et la diffusion sécurisée de données vidéo.
 
 L'objectif est de construire une plateforme capable de déployer plusieurs nœuds Edge sur des machines hétérogènes, notamment :

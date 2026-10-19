@@ -14,3 +14,8 @@ deploy/lab/.runtime/
 deploy/lab/edge-config/
 deploy/lab/smoke-results/
 deploy/lab/config/topology.lab-ready.json
+
+# Isolated integration secrets and test outputs
+deploy/integration/.runtime/
+deploy/integration/results/
+web-api.exe

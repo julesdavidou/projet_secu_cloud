@@ -1,0 +1,85 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.67kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/golang:1.27.2
+#2 DONE 0.1s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 369B done
+#3 DONE 0.0s
+
+#4 [source 1/3] FROM docker.io/library/golang:1.27.2@sha256:007a316059246276cb214df93950be77837545dc78007a73e0291a4963d5d3bf
+#4 resolve docker.io/library/golang:1.27.2@sha256:007a316059246276cb214df93950be77837545dc78007a73e0291a4963d5d3bf 0.0s done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 73.90kB 0.0s done
+#5 DONE 0.0s
+
+#6 [source 2/3] WORKDIR /src
+#6 CACHED
+
+#7 [source 3/3] COPY . .
+#7 DONE 0.0s
+
+#8 [verify 1/4] RUN test -z "$(gofmt -l pkg/controllers internal/edgecontrol internal/storage/verified*.go cmd/central-controller cmd/edge-bridge cmd/lab-admin cmd/edge-agent serveur-zone/app)"
+#8 DONE 0.1s
+
+#9 [verify 2/4] RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build go version && go test ./... && go test -race ./... && go vet ./...
+#9 0.241 go version go1.27.2 linux/amd64
+#9 0.354 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/central-controller	[no test files]
+#9 0.397 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/edge-agent	[no test files]
+#9 0.397 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/edge-bridge	[no test files]
+#9 0.397 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/lab-admin	[no test files]
+#9 0.480 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/web-api	[no test files]
+#9 0.719 ok  	github.com/julesdavidou/projet_secu_cloud/internal/edgecontrol	(cached)
+#9 0.719 ?   	github.com/julesdavidou/projet_secu_cloud/internal/monitor	[no test files]
+#9 0.719 ?   	github.com/julesdavidou/projet_secu_cloud/internal/mqttclient	[no test files]
+#9 0.719 ok  	github.com/julesdavidou/projet_secu_cloud/internal/storage	(cached)
+#9 0.989 ok  	github.com/julesdavidou/projet_secu_cloud/internal/webapp	0.020s
+#9 0.989 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/controllers	(cached)
+#9 0.989 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/placement	(cached)
+#9 0.989 ?   	github.com/julesdavidou/projet_secu_cloud/pkg/protocol	[no test files]
+#9 1.223 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/central-controller	[no test files]
+#9 1.273 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/edge-agent	[no test files]
+#9 1.273 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/edge-bridge	[no test files]
+#9 1.273 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/lab-admin	[no test files]
+#9 1.419 ?   	github.com/julesdavidou/projet_secu_cloud/cmd/web-api	[no test files]
+#9 1.775 ok  	github.com/julesdavidou/projet_secu_cloud/internal/edgecontrol	(cached)
+#9 1.775 ?   	github.com/julesdavidou/projet_secu_cloud/internal/monitor	[no test files]
+#9 1.775 ?   	github.com/julesdavidou/projet_secu_cloud/internal/mqttclient	[no test files]
+#9 1.775 ok  	github.com/julesdavidou/projet_secu_cloud/internal/storage	(cached)
+#9 3.029 ok  	github.com/julesdavidou/projet_secu_cloud/internal/webapp	1.024s
+#9 3.029 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/controllers	(cached)
+#9 3.029 ok  	github.com/julesdavidou/projet_secu_cloud/pkg/placement	(cached)
+#9 3.029 ?   	github.com/julesdavidou/projet_secu_cloud/pkg/protocol	[no test files]
+#9 DONE 3.2s
+
+#10 [verify 3/4] RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build cd serveur-zone && go test ./... && go test -race ./... && go vet ./...
+#10 0.549 ok  	serveur-zone/app	(cached)
+#10 0.938 ok  	serveur-zone/app	(cached)
+#10 DONE 1.1s
+
+#11 [verify 4/4] RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build cd lab/placement && go test ./... && go test -race ./... && go vet ./...
+#11 0.313 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/catalog	(cached)
+#11 0.313 ?   	github.com/julesdavidou/projet_secu_cloud/lab/placement/cmd/lab	[no test files]
+#11 0.313 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/mqttbus	(cached)
+#11 0.314 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/service	(cached)
+#11 0.403 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/catalog	(cached)
+#11 0.403 ?   	github.com/julesdavidou/projet_secu_cloud/lab/placement/cmd/lab	[no test files]
+#11 0.403 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/mqttbus	(cached)
+#11 0.403 ok  	github.com/julesdavidou/projet_secu_cloud/lab/placement/service	(cached)
+#11 DONE 0.5s
+
+#12 exporting to image
+#12 exporting layers 0.1s done
+#12 exporting manifest sha256:570ada5fe12f9829bfd7e7e0a0060e938fe3a125644740f44b18f0b4be56c5b3 done
+#12 exporting config sha256:748ebc0a9204a46c1eb1d238333265440950b316a6317264aef1e0408841d3bd done
+#12 exporting attestation manifest sha256:7c3296e47c9f44337671ece0c9bb5a13ba6469da731350ead8e62c33a559b584 done
+#12 exporting manifest list sha256:659ffb69dd404d73083e0acf2ccf9ac8457498e7283cb5ced7bd19800779eafa done
+#12 naming to docker.io/caribou/integration-verify:dev done
+#12 unpacking to docker.io/caribou/integration-verify:dev 0.1s done
+#12 DONE 0.3s
