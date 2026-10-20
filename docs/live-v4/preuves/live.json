@@ -1,0 +1,191 @@
+{
+  "live_id": "l-037651547e10f38ef19163f444152a2b",
+  "measurements": [
+    {
+      "sequence": 0,
+      "source_sha256": "46df74a765cfab11a1389a41568a0355189f85b66e962361189ecb89541caef1",
+      "source_bytes": 156512,
+      "publish_request_ms": 3957.159,
+      "programme_age_at_commit_ms": 6340,
+      "pending_observed": 0,
+      "video_id": "v-58d4f2638472d1cde57a62d16cf6344f",
+      "owner_publish_ms": 2249
+    },
+    {
+      "sequence": 1,
+      "source_sha256": "8e30fe2d20278bf742cef08a32b6b72504ade73ef0453716ac5e4e9350840c25",
+      "source_bytes": 161588,
+      "publish_request_ms": 3451.634,
+      "programme_age_at_commit_ms": 5994,
+      "pending_observed": 0,
+      "video_id": "v-f7d035267e635aa6a108d0bda2a74db5",
+      "owner_publish_ms": 2133
+    },
+    {
+      "sequence": 2,
+      "source_sha256": "02ee4983e4f686b421d8078cbb818a3fc68e8776969cd8f9aa97c42a71d32d0a",
+      "source_bytes": 154146,
+      "publish_request_ms": 3239.807,
+      "programme_age_at_commit_ms": 6192,
+      "pending_observed": 0,
+      "video_id": "v-930a9de02a795190c6d12730bfdb329d",
+      "owner_publish_ms": 1929
+    },
+    {
+      "sequence": 3,
+      "source_sha256": "ef1e3ae0a2d0298c2f80a80ea21f396b690c714b0fae5781cc30644dad41957d",
+      "source_bytes": 158063,
+      "publish_request_ms": 3235.461,
+      "programme_age_at_commit_ms": 5629,
+      "pending_observed": 0,
+      "video_id": "v-54fec08ecfd4c3e80a4367f73d7412b7",
+      "owner_publish_ms": 2032
+    },
+    {
+      "sequence": 4,
+      "source_sha256": "42bb7f8369a0dc801edcb6c43c877b992bdba0cdfd1389dd2c18de83311ad09e",
+      "source_bytes": 163742,
+      "publish_request_ms": 3112.124,
+      "programme_age_at_commit_ms": 5597,
+      "pending_observed": 0,
+      "video_id": "v-96ed61c7ed94cb75474e5e130f301b0c",
+      "owner_publish_ms": 1896
+    },
+    {
+      "sequence": 5,
+      "source_sha256": "108b567c00b70cf69f17b07040b7472a19f3796a57b79d1557d4d11bbe057365",
+      "source_bytes": 154712,
+      "publish_request_ms": 3251.264,
+      "programme_age_at_commit_ms": 5650,
+      "pending_observed": 0,
+      "video_id": "v-505d9cbef23c7ae201b892801cd78bf0",
+      "owner_publish_ms": 1914
+    },
+    {
+      "sequence": 6,
+      "source_sha256": "3006b31806ed6fb21cd1991b6d140992e43c1d446302e0602b8cd4732cf751e1",
+      "source_bytes": 159823,
+      "publish_request_ms": 3100.195,
+      "programme_age_at_commit_ms": 5613,
+      "pending_observed": 0,
+      "video_id": "v-8c9df119d22b1b1dc3bf240d07d72106",
+      "owner_publish_ms": 1881
+    },
+    {
+      "sequence": 7,
+      "source_sha256": "b78f7bd29669b350bf7c51e18b2e6c16022f3466bb1dd114833ccfe3f77a7291",
+      "source_bytes": 164595,
+      "publish_request_ms": 3210.704,
+      "programme_age_at_commit_ms": 5626,
+      "pending_observed": 0,
+      "video_id": "v-337a2630a961325aa77a4be3c854c28c",
+      "owner_publish_ms": 2006
+    }
+  ],
+  "clock_basis": "FFmpeg programme date-time, not camera capture; clocks must agree",
+  "physical_lab": "NOT_TESTED",
+  "end_reason": "source_finished",
+  "wall_seconds": 38.297,
+  "reference_quality": {
+    "method": "decoded frames paired by ordinal position, full retained source reference; timestamps normalized ONLY for image comparison, not latency or timing fidelity",
+    "reference_frames": 768,
+    "reconstructed_frames": 768,
+    "ssim": 1.0,
+    "psnr": "inf"
+  },
+  "reauth_interval_seconds_for_test": 5,
+  "passed": true,
+  "rtmp": "real FFmpeg TCP in real time",
+  "verified_before_source_end": true,
+  "source": "synthetic test pattern",
+  "storage": "actual isolated Edge files",
+  "zones": [
+    "A",
+    "B"
+  ],
+  "verified_fragments": [
+    {
+      "sequence": 0,
+      "video_id": "v-58d4f2638472d1cde57a62d16cf6344f",
+      "bytes": 156512,
+      "sha256": "46df74a765cfab11a1389a41568a0355189f85b66e962361189ecb89541caef1",
+      "verified_read_decode_ms": 4675.378,
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 1,
+      "video_id": "v-f7d035267e635aa6a108d0bda2a74db5",
+      "bytes": 161588,
+      "sha256": "8e30fe2d20278bf742cef08a32b6b72504ade73ef0453716ac5e4e9350840c25",
+      "verified_read_decode_ms": 1582.742,
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 2,
+      "video_id": "v-930a9de02a795190c6d12730bfdb329d",
+      "bytes": 154146,
+      "sha256": "02ee4983e4f686b421d8078cbb818a3fc68e8776969cd8f9aa97c42a71d32d0a",
+      "verified_read_decode_ms": 1184.678,
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 3,
+      "video_id": "v-54fec08ecfd4c3e80a4367f73d7412b7",
+      "bytes": 158063,
+      "sha256": "ef1e3ae0a2d0298c2f80a80ea21f396b690c714b0fae5781cc30644dad41957d",
+      "verified_read_decode_ms": 1255.981,
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 4,
+      "video_id": "v-96ed61c7ed94cb75474e5e130f301b0c",
+      "bytes": 163742,
+      "sha256": "42bb7f8369a0dc801edcb6c43c877b992bdba0cdfd1389dd2c18de83311ad09e",
+      "verified_read_decode_ms": 1288.65,
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 5,
+      "video_id": "v-505d9cbef23c7ae201b892801cd78bf0",
+      "bytes": 154712,
+      "sha256": "108b567c00b70cf69f17b07040b7472a19f3796a57b79d1557d4d11bbe057365",
+      "verified_read_decode_ms": 1228.879,
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 6,
+      "video_id": "v-8c9df119d22b1b1dc3bf240d07d72106",
+      "bytes": 159823,
+      "sha256": "3006b31806ed6fb21cd1991b6d140992e43c1d446302e0602b8cd4732cf751e1",
+      "verified_read_decode_ms": 1069.064,
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 7,
+      "video_id": "v-337a2630a961325aa77a4be3c854c28c",
+      "bytes": 164595,
+      "sha256": "b78f7bd29669b350bf7c51e18b2e6c16022f3466bb1dd114833ccfe3f77a7291",
+      "verified_read_decode_ms": 1215.073,
+      "zones": [
+        "B"
+      ]
+    }
+  ],
+  "access_revoked": true,
+  "ordered_gap_refused": true,
+  "append_after_end_refused": true
+}

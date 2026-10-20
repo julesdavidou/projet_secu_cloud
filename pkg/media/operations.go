@@ -5,6 +5,7 @@ import "encoding/json"
 // Operations change the logical media head, never the placement algorithm.
 // Content versions remain immutable and their bytes are retained explicitly.
 type Operation struct {
+	Live             *LiveEvent      `json:"live,omitempty"`
 	OwnerID          string          `json:"owner_id"`
 	VideoID          string          `json:"video_id"`
 	Nonce            string          `json:"nonce"`

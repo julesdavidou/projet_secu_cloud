@@ -1,0 +1,8 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>CaribouTV — direct mesuré</title>
+<style>body{font:16px system-ui;background:#10131b;color:#f5f7ff;margin:24px auto;max-width:1050px;padding:0 16px}input,button,select{font:inherit;padding:8px;margin:4px;background:#242a3b;color:inherit;border:1px solid #6a7697;border-radius:5px}video{width:100%;max-height:65vh;background:black}pre{white-space:pre-wrap;background:#202638;padding:16px}a{color:#a9c9ff}.note{color:#bbc6db}</style>
+<h1>Direct CaribouTV</h1><p><a href="/">Catalogue VOD</a> · <a href="/integration/">Orchestration</a></p>
+<form id="login"><input id="email" type="email" placeholder="Compte Java" required autocomplete="username"><input id="password" type="password" placeholder="Mot de passe" required autocomplete="current-password"><button>Connexion</button></form>
+<section id="viewer" hidden><button id="refresh">Actualiser les directs</button><select id="streams"></select><input id="liveid" placeholder="Identifiant l-…"><button id="watch">Lire le direct</button><button id="export">Exporter les mesures JSON</button>
+<video id="video" controls playsinline muted></video><p id="status" role="status"></p><pre id="stats"></pre></section>
+<p class="note">Le direct attend le stockage READY et la vérification SIS/IBS sur les Edge. Le retard de programme est estimé depuis l'horodatage FFmpeg et les horloges : il ne mesure pas la capture caméra. Les mesures du navigateur restent locales jusqu'à leur export. L'encodeur n'abaisse pas automatiquement la qualité pour tenir le réseau.</p>
+<script src="/assets/vendor/hls.min.js"></script><script type="module" src="/live/player.js"></script></html>

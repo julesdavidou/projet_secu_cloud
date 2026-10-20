@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -49,5 +50,26 @@ func (s *Server) rememberSecure(m Movie, path string) {
 	if s.secureCache == nil {
 		s.secureCache = map[string]secureCacheEntry{}
 	}
-	s.secureCache[m.ID] = secureCacheEntry{Path: path, ContentHash: digest, ProofHash: movieProofHash(m), Expires: time.Now().Add(time.Minute)}
+	s.secureCache[m.ID] = secureCacheEntry{Live: strings.HasPrefix(m.RootID, "l-"), Path: path, ContentHash: digest, ProofHash: movieProofHash(m), Expires: time.Now().Add(time.Minute)}
+	for {
+		count := 0
+		oldest := ""
+		var expiration time.Time
+		for id, entry := range s.secureCache {
+			if entry.Live {
+				count++
+				if oldest == "" || entry.Expires.Before(expiration) {
+					oldest = id
+					expiration = entry.Expires
+				}
+			}
+		}
+		if count <= 64 {
+			break
+		}
+		entry := s.secureCache[oldest]
+		delete(s.secureCache, oldest)
+		delete(s.verified, oldest)
+		_ = os.Remove(entry.Path)
+	}
 }

@@ -578,6 +578,7 @@ func RunCentral(ctx context.Context, cfg Config) error {
 		JSON(w, 200, out)
 	})
 	c.operationAPI(api)
+	c.liveAPI(api)
 	mux.Handle("/api/", Bearer(token, api))
 	return Serve(ctx, Env("HTTP_ADDR", ":8088"), mux)
 }

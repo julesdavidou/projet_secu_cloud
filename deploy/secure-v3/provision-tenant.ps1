@@ -8,7 +8,8 @@ param(
     [Parameter(Mandatory)][ValidatePattern('^[A-Za-z0-9][A-Za-z0-9_.-]{0,100}$')][string]$Node,
  [ValidatePattern('^[a-z0-9][a-z0-9-]{0,62}$')][string]$Project='caribou-secure-v3',
  [string]$ControlImage='caribou/secure-v3-control:dev',
- [string]$SecurityImage='caribou/secure-v3-security:dev'
+ [string]$SecurityImage='caribou/secure-v3-security:dev',
+ [string]$RuntimeDirectory="$PSScriptRoot/.runtime"
 )
 $ErrorActionPreference='Stop'
 if(-not (Get-Command docker -ErrorAction SilentlyContinue)){$env:PATH="${env:LOCALAPPDATA}/Programs/DockerDesktop/resources/bin;"+$env:PATH}
@@ -19,7 +20,7 @@ $identity=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.
 $name="$deploymentProject-$nodeLower-$identity"
 $volume="$name-data"
 $dns="tenant-$identity.storage-$nodeLower.internal"
-$runtime=Join-Path $PSScriptRoot '.runtime'
+$runtime=[IO.Path]::GetFullPath($RuntimeDirectory)
 $topology=Get-Content -LiteralPath (Join-Path $runtime 'config.json') -Raw|ConvertFrom-Json
 if(@($topology.nodes|Where-Object {$_.id -eq $Node}).Count -ne 1){throw 'Node is not provisioned in config.json'}
 $directory=Join-Path $runtime "tenant-$Node"

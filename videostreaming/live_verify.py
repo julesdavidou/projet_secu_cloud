@@ -1,4 +1,7 @@
-"""Vérifie, pour un segment live donné, la signature SIS/IBS en récupérant
+"""OUTIL HISTORIQUE : format/crypto du prototype antérieur à V3.
+Parcours actuel : deploy/live-v4/live-check.py ; voir README_live_streaming.md.
+
+Vérifie, pour un segment live donné, la signature SIS/IBS en récupérant
 les blocs DEPUIS L'EDGE AGENT (réseau réel), pas depuis le disque local —
 contrairement à security_demo.py qui vérifie en mémoire. C'est le test qui
 dit si ce que le lecteur recevra vraiment est authentique et intact.

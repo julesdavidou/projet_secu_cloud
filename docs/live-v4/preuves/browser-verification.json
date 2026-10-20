@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "live_id": "l-037651547e10f38ef19163f444152a2b",
+  "first_frames_before_end": true,
+  "browser_observation_unix_ms": 1792485029241,
+  "rtmp_source_end_unix_ms": 1792485050921,
+  "browser": "Playwright Chromium headless AMD64",
+  "first_snapshot": {
+    "elapsed_ms": 10113,
+    "first_display_ms": 9436,
+    "first_display_basis": "requestVideoFrameCallback",
+    "rendered_frames": 13,
+    "dropped_frames": 0,
+    "total_video_frames": 17,
+    "render_fps": 17.722640673460337,
+    "stall_count": 0,
+    "stall_ms": 0,
+    "buffer_ahead_seconds": 3.345,
+    "live_edge_distance_seconds": 5.447278,
+    "programme_age_estimate_ms": 8133,
+    "clock_sync_rtt_uncertainty_ms": 3.5,
+    "paused": false,
+    "ended": false,
+    "ready_state": 4,
+    "last_fragment_download": {
+      "sequence": 0,
+      "bytes": 155140,
+      "download_ms": 918.3999999761581,
+      "ttfb_ms": 915.6999999880791,
+      "server_timing": "verified_reconstruction;dur=907.020"
+    }
+  },
+  "download_count": 8,
+  "page_errors": [],
+  "glass_to_glass": "NOT_MEASURED; programme time only",
+  "physical_lab": "NOT_TESTED"
+}

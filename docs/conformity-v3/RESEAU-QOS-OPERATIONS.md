@@ -1,5 +1,7 @@
 # Réseau, QoS/prix et opérations signées — livraison V3
 
+> État historique V3 : le live ajouté ensuite est décrit dans [la livraison V4 du 20/10](../live-v4/LIVRAISON.md). Les limites matérielles et cryptographiques V3 demeurent.
+
 Ce lot prolonge `codex/conformity-v3-review` et la PR draft #6. Aucun merge. Les versions des collègues, Auth Java, l’allocator de Dan, le placement Go, le catalogue SQLite, le stockage HTTP et le frontend restent utilisés. Les anciens bancs ne sont pas arrêtés et leurs volumes ne sont pas migrés.
 
 ## Décisions et raisons

@@ -62,7 +62,7 @@ func Open(path string) (*Catalog, error) {
 	if path != ":memory:" && mode != "wal" {
 		return fail(fmt.Errorf("WAL unavailable: %s", mode))
 	}
-	if _, err = db.Exec(schema + operationSchema); err != nil {
+	if _, err = db.Exec(schema + operationSchema + liveSchema); err != nil {
 		return fail(err)
 	}
 	return &Catalog{db}, nil
