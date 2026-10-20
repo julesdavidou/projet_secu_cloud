@@ -1,0 +1,163 @@
+name: Fleet images (GHCR)
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: fleet-images-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  automation-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - name: Fleet unit tests and native PowerShell launchers (no SSH)
+        run: python -m unittest discover -s deploy/fleet -p 'test_*.py' -v
+
+  verify:
+    needs: automation-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Frontend contracts
+        working-directory: frontend
+        run: npm test
+      - name: Deployment shells, rollback and temporary credential cleanup (fake Docker)
+        run: docker run --rm --network none --env CARIBOU_SHELL_TESTS=1 --mount "type=bind,source=$PWD,target=/repo,readonly" --workdir /repo python:3.13-slim python -m unittest discover -s deploy/fleet -p test_shell.py -v
+      - name: Check all three Dockerfiles
+        run: |
+          for file in deploy/lab/Dockerfile deploy/integration/Dockerfile.auth deploy/integration/Dockerfile.web; do
+            docker buildx build --check -f "$file" .
+          done
+      - name: Go tests, race and vet (three modules)
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/lab/Dockerfile
+          target: verify
+          push: false
+          cache-from: type=gha,scope=fleet-verify
+          cache-to: type=gha,scope=fleet-verify,mode=max
+      - name: Existing isolated real storage, Java authentication and playback tests
+        shell: pwsh
+        run: |
+          ./deploy/integration/start.ps1
+          ./deploy/integration/smoke.ps1
+      - name: Stop only disposable CI services (keep volumes)
+        if: always()
+        run: docker compose -f deploy/integration/compose.yaml down
+
+  build:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: control, arch: amd64, platform: linux/amd64, file: deploy/lab/Dockerfile, target: runtime}
+          - {image: control, arch: arm64, platform: linux/arm64, file: deploy/lab/Dockerfile, target: runtime}
+          - {image: control, arch: arm-v7, platform: linux/arm/v7, file: deploy/lab/Dockerfile, target: runtime}
+          - {image: auth, arch: amd64, platform: linux/amd64, file: deploy/integration/Dockerfile.auth, target: ''}
+          - {image: web, arch: amd64, platform: linux/amd64, file: deploy/integration/Dockerfile.web, target: ''}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        if: matrix.arch != 'amd64'
+        with:
+          platforms: arm,arm64
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: metadata
+        with:
+          images: ghcr.io/${{ github.repository }}-${{ matrix.image }}
+          tags: type=raw,value=sha-${{ github.sha }}-${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          load: true
+          provenance: false
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=fleet-${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=fleet-${{ matrix.image }}-${{ matrix.arch }},mode=max
+      - name: Run actual Edge HTTP health on the target platform (QEMU for ARM)
+        if: matrix.image == 'control'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}-control:sha-${{ github.sha }}-${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: docker run --rm --network none --platform "$PLATFORM" --tmpfs /data:uid=10001,gid=10001 --mount "type=bind,source=$PWD/deploy/fleet/platform-smoke.sh,target=/smoke.sh,readonly" "$IMAGE" sh /smoke.sh
+
+  publish-manifests:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish commit manifests only after every platform smoke passed
+        env:
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for component in control auth web; do
+            image="ghcr.io/${REPOSITORY,,}-$component"
+            sources=("$image:sha-$REVISION-amd64")
+            if [ "$component" = control ]; then
+              sources+=("$image:sha-$REVISION-arm64" "$image:sha-$REVISION-arm-v7")
+            fi
+            docker buildx imagetools create --tag "$image:sha-$REVISION" --tag "$image:main" "${sources[@]}"
+            docker buildx imagetools inspect "$image:sha-$REVISION" >> "$GITHUB_STEP_SUMMARY"
+          done

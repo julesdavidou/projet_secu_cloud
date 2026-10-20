@@ -1,6 +1,6 @@
 name: caribou-integration
 x-common: &common
-  image: caribou/integration-control:dev
+  image: ${CONTROL_IMAGE:-caribou/integration-control:dev}
   restart: unless-stopped
   init: true
   cpus: 1.0
@@ -134,13 +134,13 @@ services:
       - ./.runtime/identities/edge-${EDGE_B_ID:-B1}:/run/lab-secrets:ro
       - edge-b-files:/data
   auth:
-    image: caribou/integration-auth:dev
+    image: ${AUTH_IMAGE:-caribou/integration-auth:dev}
     build: {context: ../.., dockerfile: deploy/integration/Dockerfile.auth}
     restart: unless-stopped
     volumes: ["auth-data:/data"]
     networks: [control]
   web:
-    image: caribou/integration-web:dev
+    image: ${WEB_IMAGE:-caribou/integration-web:dev}
     build: {context: ../.., dockerfile: deploy/integration/Dockerfile.web}
     restart: unless-stopped
     init: true

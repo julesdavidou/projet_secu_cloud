@@ -1,9 +1,17 @@
-FROM --platform=$BUILDPLATFORM golang:1.27.2 AS build
+# syntax=docker/dockerfile:1
+FROM --platform=$BUILDPLATFORM golang:1.27.2 AS dependencies
 WORKDIR /src
-COPY . .
+COPY go.mod go.sum ./
+COPY lab/placement/go.mod lab/placement/go.sum ./lab/placement/
+RUN go mod download
+FROM dependencies AS build
+COPY cmd/web-api/ ./cmd/web-api/
+COPY internal/ ./internal/
+COPY pkg/ ./pkg/
+COPY lab/placement/ ./lab/placement/
 ARG TARGETOS
 ARG TARGETARCH
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/web-api ./cmd/web-api
+RUN --mount=type=cache,target=/go/pkg/mod,from=dependencies,source=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/web-api ./cmd/web-api
 FROM alpine:3.22
 RUN apk add --no-cache ffmpeg python3 py3-pip && python3 -m venv /opt/video && /opt/video/bin/pip install --no-cache-dir ffmpeg-python==0.2.0 && addgroup -g 10001 -S caribou && adduser -u 10001 -S -G caribou caribou && mkdir /data && chown caribou:caribou /data
 ENV PATH="/opt/video/bin:$PATH"
@@ -12,6 +20,9 @@ COPY frontend/dist/ /app/frontend/
 COPY deploy/integration/console/ /app/console/
 COPY integrations/video/ /app/video/
 COPY videostreaming/ /app/vendor-video/
+ARG VERSION=dev
+LABEL org.opencontainers.image.revision=$VERSION
+LABEL org.opencontainers.image.source="https://github.com/julesdavidou/projet_secu_cloud"
 USER 10001:10001
 EXPOSE 8080
 HEALTHCHECK --interval=3s --timeout=5s --retries=30 CMD wget -q -O - http://127.0.0.1:8080/ready || exit 1

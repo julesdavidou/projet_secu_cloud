@@ -1,0 +1,13 @@
+{
+  "remote_directory": "cariboutv-lab",
+  "mqtt_port": 1884,
+  "web_port": 18090,
+  "central_port": 19088,
+  "nodes": [
+    {"id":"jetson02","host":"192.168.1.6","user":"jetson02","password":"CHANGE_ME","zone":"A","quota_bytes":1073741824,"http_port":18081},
+    {"id":"camera","host":"192.168.2.54","user":"camera","password":"CHANGE_ME","zone":"B","quota_bytes":1073741824,"http_port":18081},
+    {"id":"raspberry04","host":"192.168.2.76","user":"raspberry04","password":"CHANGE_ME","zone":"B","quota_bytes":1073741824,"http_port":18081},
+    {"id":"raspberry05","host":"192.168.2.11","user":"raspberry05","password":"CHANGE_ME","zone":"B","quota_bytes":1073741824,"http_port":18081},
+    {"id":"jetson03","host":"192.168.2.68","user":"jetson03","password":"CHANGE_ME","zone":"B","quota_bytes":1073741824,"http_port":18081}
+  ]
+}

@@ -1,3 +1,4 @@
 
 # Linux scripts must stay runnable after checkout on Windows.
 *.sh text eol=lf
+*.go text eol=lf

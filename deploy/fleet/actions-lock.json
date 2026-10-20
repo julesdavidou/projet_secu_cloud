@@ -1,0 +1,47 @@
+{
+  "actions/checkout": {
+    "tag": "v7.0.1",
+    "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "url": "https://github.com/actions/checkout/releases/tag/v7.0.1"
+  },
+  "actions/setup-python": {
+    "tag": "v7.0.0",
+    "sha": "5fda3b95a4ea91299a34e894583c3862153e4b97",
+    "url": "https://github.com/actions/setup-python/releases/tag/v7.0.0"
+  },
+  "actions/setup-node": {
+    "tag": "v7.1.0",
+    "sha": "949feb2413d6458794dcd2491c4babbbce0c15c1",
+    "url": "https://github.com/actions/setup-node/releases/tag/v7.1.0"
+  },
+  "actions/upload-artifact": {
+    "tag": "v7.0.2",
+    "sha": "cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+    "url": "https://github.com/actions/upload-artifact/releases/tag/v7.0.2"
+  },
+  "docker/setup-qemu-action": {
+    "tag": "v4.4.0",
+    "sha": "99012661954931238ded8c8b007157a8430204e1",
+    "url": "https://github.com/docker/setup-qemu-action/releases/tag/v4.4.0"
+  },
+  "docker/setup-buildx-action": {
+    "tag": "v4.4.1",
+    "sha": "f87e5991a6d7451dcb8d9637bfbc97413f497069",
+    "url": "https://github.com/docker/setup-buildx-action/releases/tag/v4.4.1"
+  },
+  "docker/login-action": {
+    "tag": "v4.6.0",
+    "sha": "dbcb813823bdd20940b903addbd779551569679f",
+    "url": "https://github.com/docker/login-action/releases/tag/v4.6.0"
+  },
+  "docker/metadata-action": {
+    "tag": "v6.2.0",
+    "sha": "dc802804100637a589fabce1cb79ff13a1411302",
+    "url": "https://github.com/docker/metadata-action/releases/tag/v6.2.0"
+  },
+  "docker/build-push-action": {
+    "tag": "v7.4.0",
+    "sha": "c3c9e263c25d99ce0380d002d59b67737d91b0dc",
+    "url": "https://github.com/docker/build-push-action/releases/tag/v7.4.0"
+  }
+}

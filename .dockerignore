@@ -30,3 +30,8 @@ deploy/secure-v3/results/
 # Independent signed live lab
 deploy/live-v4/.runtime/
 deploy/live-v4/results/
+
+# Fleet access credentials and deployment reports
+deploy/fleet/inventory.local.json
+deploy/fleet/.runtime/
+**/__pycache__/
