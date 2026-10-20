@@ -13,5 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 COPY --from=build /out/ /app/classes/
 COPY --from=tlsbuild /tls-run /usr/local/bin/tls-run
 USER 10001:10001
+ARG VERSION=dev
+LABEL org.opencontainers.image.revision=$VERSION
+LABEL org.opencontainers.image.source="https://github.com/julesdavidou/projet_secu_cloud"
 HEALTHCHECK --interval=3s --timeout=3s --retries=30 CMD curl -fsS http://127.0.0.1:8082/health || exit 1
 CMD ["tls-run", "java", "-Duser.home=/data", "-Dweb.bind=127.0.0.1", "-Dweb.port=8082", "-cp", "/app/classes", "secucloud.auth.WebApplicationServer"]

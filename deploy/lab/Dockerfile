@@ -24,7 +24,7 @@ FROM source AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
-RUN --mount=type=cache,target=/go/pkg/mod,from=dependencies,source=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build GOARM=${TARGETVARIANT#v}; export GOARM=${GOARM:-7}; CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/ ./cmd/central-controller ./cmd/edge-bridge ./cmd/edge-agent ./cmd/lab-admin ./cmd/tls-run
+RUN --mount=type=cache,target=/go/pkg/mod,from=dependencies,source=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build GOARM=${TARGETVARIANT#v}; export GOARM=${GOARM:-7}; CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/ ./cmd/central-controller ./cmd/edge-bridge ./cmd/edge-agent ./cmd/lab-admin ./cmd/tls-run ./cmd/client-portal
 RUN --mount=type=cache,target=/go/pkg/mod,from=dependencies,source=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build cd serveur-zone && GOARM=${TARGETVARIANT#v}; export GOARM=${GOARM:-7}; CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/serveur-zone ./app
 FROM alpine:3.22 AS runtime
 RUN addgroup -g 10001 -S caribou && adduser -u 10001 -S -G caribou caribou && mkdir /data && chown caribou:caribou /data
@@ -32,6 +32,7 @@ COPY --from=builder /out/ /usr/local/bin/
 ARG VERSION=dev
 LABEL org.opencontainers.image.revision=$VERSION
 LABEL org.opencontainers.image.source="https://github.com/julesdavidou/projet_secu_cloud"
+LABEL io.caribou.client-portal="1"
 USER 10001:10001
 EXPOSE 8088
 HEALTHCHECK --interval=2s --timeout=2s --retries=30 CMD wget -q -O - http://127.0.0.1:8088/ready || exit 1

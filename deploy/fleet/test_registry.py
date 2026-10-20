@@ -46,6 +46,11 @@ class RegistryTests(unittest.TestCase):
         self.assertNotIn('private-test-token',json.dumps(plan))
         self.assertEqual(image_name('owner/project','web'),'owner/project-web')
 
+    def test_secure_portal_capability_is_required_only_for_client_bundles(self):
+        with patch.object(self.registry,'_request',side_effect=self.resolver),self.assertRaisesRegex(RegistryError,'portail'):
+            self.registry.resolve('owner/project','control',self.commit,'linux/arm/v7',require_client_portal=True)
+        self.plan()  # Existing Fleet legacy deployments stay compatible.
+
     def test_unsupported_platform_and_missing_platform(self):
         for platform in ('linux/arm64','linux/mips'):
             with self.subTest(platform=platform),patch.object(self.registry,'_request',side_effect=self.resolver),self.assertRaises(RegistryError):

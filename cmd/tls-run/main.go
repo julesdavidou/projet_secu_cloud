@@ -31,11 +31,17 @@ func main() {
 	if len(os.Args) < 2 {
 		log.Fatal("child service required")
 	}
-	child := exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
-	child.Stdout = os.Stdout
-	child.Stderr = os.Stderr
-	if e := child.Start(); e != nil {
-		log.Fatal(e)
+	if os.Args[1] == "-proxy-only" && len(os.Args) != 2 {
+		log.Fatal("proxy-only accepts no child arguments")
+	}
+	var child *exec.Cmd
+	if os.Args[1] != "-proxy-only" {
+		child = exec.CommandContext(ctx, os.Args[1], os.Args[2:]...)
+		child.Stdout = os.Stdout
+		child.Stderr = os.Stderr
+		if e := child.Start(); e != nil {
+			log.Fatal(e)
+		}
 	}
 	target, e := url.Parse(env("TLS_UPSTREAM", "http://127.0.0.1:8088"))
 	if e != nil {
@@ -72,12 +78,14 @@ func main() {
 		proxy.ServeHTTP(w, r)
 	})
 	server := &http.Server{Addr: env("TLS_BIND", ":8443"), Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 180 * time.Second, WriteTimeout: 180 * time.Second, TLSConfig: &tls.Config{MinVersion: tls.VersionTLS13, ClientCAs: roots, ClientAuth: tls.RequireAndVerifyClientCert}}
-	go func() {
-		if e := child.Wait(); e != nil {
-			log.Print("child stopped: ", e)
-		}
-		cancel()
-	}()
+	if child != nil {
+		go func() {
+			if e := child.Wait(); e != nil {
+				log.Print("child stopped: ", e)
+			}
+			cancel()
+		}()
+	}
 	go func() {
 		<-ctx.Done()
 		shutdown, stop := context.WithTimeout(context.Background(), 3*time.Second)

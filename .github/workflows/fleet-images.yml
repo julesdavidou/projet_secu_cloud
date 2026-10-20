@@ -88,6 +88,10 @@ jobs:
           - {image: control, arch: arm-v7, platform: linux/arm/v7, file: deploy/lab/Dockerfile, target: runtime}
           - {image: auth, arch: amd64, platform: linux/amd64, file: deploy/integration/Dockerfile.auth, target: ''}
           - {image: web, arch: amd64, platform: linux/amd64, file: deploy/integration/Dockerfile.web, target: ''}
+          - {image: secure-security, arch: amd64, platform: linux/amd64, file: deploy/secure-v3/Dockerfile.security, target: ''}
+          - {image: secure-security, arch: arm64, platform: linux/arm64, file: deploy/secure-v3/Dockerfile.security, target: ''}
+          - {image: secure-web, arch: amd64, platform: linux/amd64, file: deploy/secure-v3/Dockerfile.web, target: ''}
+          - {image: secure-auth, arch: amd64, platform: linux/amd64, file: deploy/secure-v3/Dockerfile.auth, target: ''}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -131,6 +135,12 @@ jobs:
           IMAGE: ghcr.io/${{ github.repository }}-control:sha-${{ github.sha }}-${{ matrix.arch }}
           PLATFORM: ${{ matrix.platform }}
         run: docker run --rm --network none --platform "$PLATFORM" --tmpfs /data:uid=10001,gid=10001 --mount "type=bind,source=$PWD/deploy/fleet/platform-smoke.sh,target=/smoke.sh,readonly" "$IMAGE" sh /smoke.sh
+      - name: Run actual SIS/IBS library on target platform (QEMU for ARM64)
+        if: matrix.image == 'secure-security'
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}-secure-security:sha-${{ github.sha }}-${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: docker run --rm --network none --platform "$PLATFORM" --cap-drop ALL --security-opt no-new-privileges:true "$IMAGE" python -m unittest test_secure_sis test_secure_operations test_publication_retry -v
 
   publish-manifests:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -152,11 +162,14 @@ jobs:
           REVISION: ${{ github.sha }}
         run: |
           set -euo pipefail
-          for component in control auth web; do
+          for component in control auth web secure-security secure-web secure-auth; do
             image="ghcr.io/${REPOSITORY,,}-$component"
             sources=("$image:sha-$REVISION-amd64")
             if [ "$component" = control ]; then
               sources+=("$image:sha-$REVISION-arm64" "$image:sha-$REVISION-arm-v7")
+            fi
+            if [ "$component" = secure-security ]; then
+              sources+=("$image:sha-$REVISION-arm64")
             fi
             docker buildx imagetools create --tag "$image:sha-$REVISION" --tag "$image:main" "${sources[@]}"
             docker buildx imagetools inspect "$image:sha-$REVISION" >> "$GITHUB_STEP_SUMMARY"

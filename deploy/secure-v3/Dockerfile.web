@@ -13,6 +13,9 @@ COPY deploy/integration/console/ /app/console/
 COPY integrations/video/ /app/video/
 COPY videostreaming/ /app/vendor-video/
 USER 10001:10001
+ARG VERSION=dev
+LABEL org.opencontainers.image.revision=$VERSION
+LABEL org.opencontainers.image.source="https://github.com/julesdavidou/projet_secu_cloud"
 EXPOSE 8080
 HEALTHCHECK --interval=3s --timeout=5s --retries=30 CMD wget -q -O - http://127.0.0.1:8080/ready || exit 1
 CMD ["tls-run", "web-api"]

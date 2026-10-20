@@ -6,6 +6,7 @@ import (
 	"github.com/julesdavidou/projet_secu_cloud/pkg/controllers"
 	"log"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -15,6 +16,7 @@ func main() {
 	edgeBrokers := flag.Bool("edge-brokers", false, "provision per-Edge broker routes")
 	hub := flag.String("hub", "broker:1883", "reachable MQTT hub host:port")
 	secure := flag.Bool("secure-v3", false, "provision transport PKI for secure profile")
+	clients := flag.String("clients", "", "explicit viewer-lab-/owner-lab- transport actors, comma separated")
 	flag.Parse()
 	raw, e := os.ReadFile(*path)
 	if e != nil {
@@ -36,7 +38,11 @@ func main() {
 		}
 	}
 	if *secure {
-		if e = controllers.ProvisionPKI(cfg, *out); e != nil {
+		var actors []string
+		if *clients != "" {
+			actors = strings.Split(*clients, ",")
+		}
+		if e = controllers.ProvisionPKIClients(cfg, *out, actors); e != nil {
 			log.Fatal(e)
 		}
 	}

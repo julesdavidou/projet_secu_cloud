@@ -14,12 +14,29 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // ProvisionPKI creates project certificates once. Transport keys are unrelated to
 // SIS/IBS identity keys, which remain in their respective authority/client volumes.
 func ProvisionPKI(cfg Config, out string) error {
+	return ProvisionPKIClients(cfg, out, nil)
+}
+
+// ProvisionPKIClients adds explicitly admitted laptop transport identities.
+// These certificates are unrelated to users' SIS/IBS private keys.
+func ProvisionPKIClients(cfg Config, out string, clients []string) error {
+	for _, actor := range clients {
+		if !(strings.HasPrefix(actor, "viewer-lab-") || strings.HasPrefix(actor, "owner-lab-")) || len(actor) > 80 || actor == "viewer-lab-" || actor == "owner-lab-" {
+			return errors.New("only viewer-lab-/owner-lab- client identities are allowed")
+		}
+		for _, c := range actor {
+			if !(c >= 'a' && c <= 'z' || c >= '0' && c <= '9' || c == '-') {
+				return errors.New("invalid client identity")
+			}
+		}
+	}
 	root := filepath.Join(out, "pki")
 	uid, _ := strconv.Atoi(Env("HOST_UID", "1000"))
 	write := func(path string, raw []byte, mode os.FileMode) error {
@@ -98,6 +115,10 @@ func ProvisionPKI(cfg Config, out string) error {
 		return errors.New("CA key mismatch")
 	}
 	actors := map[string][]string{"central": {"central"}, "web": {"web"}, "auth": {"auth"}, "broker": {"broker"}, "admin": {"admin"}, "owner-a": {"owner-a", "localhost"}, "owner-b": {"owner-b", "localhost"}}
+	actors["viewer-gateway"] = []string{"viewer-gateway"}
+	for _, actor := range clients {
+		actors[actor] = []string{actor, "localhost"}
+	}
 	for _, z := range cfg.Zones {
 		actors["zone-"+z] = []string{"zone-" + z, "zone-" + lower(z)}
 		actors["authority-"+z] = []string{"authority-" + z, "is-" + lower(z)}

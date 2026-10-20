@@ -27,7 +27,7 @@ def require_digest(value):
 def image_name(repository, component):
     if not re.fullmatch(r'[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*',repository):
         raise RegistryError('Repository attendu sous la forme owner/repository en minuscules.')
-    if component not in ('control','auth','web'):
+    if component not in ('control','auth','web','secure-security','secure-web','secure-auth'):
         raise RegistryError('Composant inconnu.')
     return f'{repository}-{component}'
 
@@ -74,7 +74,7 @@ class Registry:
             raise RegistryError('Le contenu GHCR ne correspond pas au digest annoncé.')
         return json.loads(data),actual
 
-    def resolve(self,repository,component,commit,platform):
+    def resolve(self,repository,component,commit,platform,require_client_portal=False):
         if not re.fullmatch('[0-9a-f]{40}',commit): raise RegistryError('Commit Git complet requis.')
         if platform not in ('linux/amd64','linux/arm64','linux/arm/v7'): raise RegistryError('Plateforme non prise en charge.')
         name = image_name(repository,component)
@@ -94,6 +94,8 @@ class Registry:
         labels = config.get('config',{}).get('Labels') or {}
         if labels.get('org.opencontainers.image.revision')!=commit:
             raise RegistryError(f'{component} : révision OCI différente du commit demandé.')
+        if require_client_portal and labels.get('io.caribou.client-portal')!='1':
+            raise RegistryError('Image sans portail client sécurisé ; choisir le commit de cette intégration.')
         if config.get('os')!='linux' or config.get('architecture')!=arch or (variant and config.get('variant')!=variant):
             raise RegistryError(f'{component} : configuration incompatible avec {platform}.')
         return {'reference':f'ghcr.io/{name}@{manifest_digest}','digest':manifest_digest,
