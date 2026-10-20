@@ -24,6 +24,13 @@ Les scripts ne les installent pas et ne changent aucune politique Windows.
 L'aide LAN fonctionne en Python pur (`SKIP_CYTHON=1`) : ne pas désactiver
 App Control/Defender pour charger une extension Cython refusée.
 
+Le 20 octobre, cinq identités ont été admises explicitement : JULES1, WIN2,
+WIN4 en zone A ; WIN3, WIN5 en zone B. Plafond : 1 Gio chacune. Les IP peuvent
+rester inconnues jusqu'au lancement : Windows sélectionne la route vers le
+contrôleur, puis la zone valide l'annonce mTLS du nœud. Un paquet distinct
+correspond à chaque PC, avec son propre compte de démo et mot de passe aléatoire
+dans `account.private.json`. Ne pas échanger ces paquets.
+
 ## Préparation unique sur le PC contrôleur
 
 Depuis la racine du dépôt contenant cette intégration :
@@ -43,6 +50,16 @@ La passerelle n'accepte que les certificats `viewer-lab-*` et écoute en mTLS
 sur le LAN, port 19693. Le navigateur reste sur `localhost` via son portail.
 Les droits Java et l'obligation SIS/IBS sont conservés. Le magasin de certificats
 Windows n'est pas modifié. Les contrôleurs ne deviennent pas publics.
+
+Après redémarrage du PC contrôleur, conserver le runtime et utiliser :
+
+```powershell
+./deploy/fleet/resume-controllers.ps1 -BindAddress 192.168.2.51
+```
+
+Cette commande réutilise les admissions actuelles et relance les aides LAN
+natives. Ne pas réinitialiser avec l'exemple à deux nœuds : il ne contient pas
+les nouvelles admissions. Aucun volume n'est supprimé.
 
 **Ajouter le stockage nécessite une admission administrative explicite.**
 Vérifier d'abord le plan sans `--apply` ; l'application recharge les contrôleurs
@@ -80,6 +97,7 @@ Transférer le dossier privé entier, par un canal privé, puis dans ce dossier 
 
 ```powershell
 pwsh -NoProfile -File ./start.ps1
+# Au premier lancement : 0 = sans stockage ; 0,5 = ajoute 0,5 Gio.
 # Avec le rôle storage : quota demandé, ou valeur explicite sous le plafond :
 pwsh -NoProfile -File ./start.ps1 -QuotaGiB 0.5 -InterfaceIPv4 192.168.2.64
 ```
@@ -103,12 +121,21 @@ Les mots de passe sont demandés interactivement et transmis au processus par
 stdin. Le contrôle reste MQTT/TLS ; l'entrée live est RTMP/TCP et la lecture
 HLS/HTTP dans le portail, puis mTLS sur le LAN. **Ce n'est pas RTP/UDP.**
 
+Les paquets de démo permettent aussi `./publish.ps1 -UseBundleAccount -FilePath
+C:/Videos/demo.mp4 -Public`, sans mot de passe dans la commande. Le compte privé
+est vérifié contre les propriétaires de ce paquet. Les mesures producteur sont
+exportées dans `.runtime/measurements/` ; le lecteur conserve son propre export.
+
 Le quota est un **plafond logique des blocs du projet**, réservés et stockés,
 partagé entre les espaces utilisateurs de cet Edge. Il ne réserve pas une
 partition du disque. Le nœud vérifie aussi l'espace libre. Après premier
 lancement, changer le quota est refusé sans migration explicite, sans effacer
 les données. Les anciens A1/B1 sont configurés à 256 Mio chacun ; ce n'est pas
 une valeur universelle imposée à tous les appareils.
+
+Le choix 0 ne lance aucun Edge/broker/worker ni espace de stockage local. Les
+choix sont conservés aux relancements ; leur modification demande une migration
+explicite, sans supprimer les fichiers d'état pour contourner les contrôles.
 
 Le stockage utilise des fichiers dans les volumes Docker par propriétaire,
 avec métadonnées locales persistantes. SQLite Central référence les placements ;
@@ -157,7 +184,17 @@ faux Docker : ils vérifient les contrats, **pas** un stockage réel distant.
 Le test réel de portail sur le PC contrôleur a récupéré 1 484 048 octets avec
 SHA-256 `760377b11c6480dbd192017a65677a31563d5b7007f309e8970eff46168a3e1e`,
 et refusé la lecture par un autre compte. Les tests Go/race/vet et Fleet sont
-exécutés séparément. Le PC physique de Jules, ses règles réseau, OBS/caméra,
+exécutés séparément. Le nouveau JULES1 a aussi été testé **sur le PC contrôleur**
+avec 0,5 Gio : admission MQTT, routes LAN, fichiers réels de 31/65 537 octets
+relus après redémarrage ; corruption et croisement d'utilisateurs refusés.
+`smoke-storage.py --bundle CHEMIN --allow-test-restart --output preuve.json`
+reproduit ce test des backends ; il ne teste pas à lui seul Go/SIS/IBS.
+Le nœud local temporaire a été arrêté avec un ledger sans blocs catalogue pour
+laisser Jules installer la même identité sur son PC. Ses volumes sont conservés.
+Le nouvel agent a publié deux fragments signés puis reconstruits à l'identique
+via Go et A1/B1. Le choix 0 a été installé réellement, puis le compte PC-5 a
+publié un direct public avec export de mesures, relu par le compte Jules.
+Le PC physique de Jules, ses règles réseau, OBS/caméra,
 les RPi/Jetson et la charge multi-producteurs restent à valider sur place.
 Les mesures live existantes restent des horodatages FFmpeg/lecteur ; elles ne
 mesurent pas seules la latence optique caméra-écran.

@@ -78,6 +78,11 @@ def make_bundle(runtime,out,client,selected,controller,images,owners,node=None,o
  for value in compose['services'].values():
   value.update(restart='unless-stopped',init=True,labels={'caribou.client':client,'caribou.profile':'secure-v3'},extra_hosts={h:controller for h in ['central','web','auth','is-a','is-b','zone-a','zone-b','broker']})
   value.setdefault('cap_drop',['ALL']);value.setdefault('security_opt',['no-new-privileges:true'])
+ if spec:
+  # Existing Mosquitto entrypoint copies private certificates, changes their
+  # ownership/mode, then Mosquitto drops to its own UID/GID. Preserve only the
+  # capabilities necessary for those operations, never a Docker engine mount.
+  compose['services']['broker']['cap_add']=['CHOWN','DAC_OVERRIDE','FOWNER','SETUID','SETGID']
  write(out/'compose.json',compose)
  ca=next((runtime/'pki'/a/'ca.crt' for a in actors),runtime/'pki'/('edge-'+node)/'ca.crt' if node else runtime/'pki'/'admin'/'ca.crt')
  ca_digest=hashlib.sha256(ssl.PEM_cert_to_DER_cert(ca.read_text())).hexdigest()
@@ -95,7 +100,10 @@ def install(folder,quota=None,registry_user=None):
  try:
   compose_version(command(['docker','compose','version','--short']))
   if command(['docker','info','--format','{{.OSType}}/{{.Architecture}}']) not in ['linux/x86_64','linux/amd64']:raise ValueError('Windows pack requires Docker Desktop in Linux AMD64 mode')
-  selected=profile['roles'];limit=quota_bytes(quota,profile['max_quota_bytes']) if 'storage' in selected else 0
+  selected=list(profile['roles'])
+  if 'storage' in selected and quota is not None and float(quota)==0:selected.remove('storage')
+  if not selected:raise ValueError('at least one role must remain enabled')
+  limit=quota_bytes(quota,profile['max_quota_bytes']) if 'storage' in selected else 0
   state={'roles':selected,'quota_bytes':limit,'client_id':profile['client_id']}
   old=runtime/'installation.json'
   if old.exists() and read(old)!=state:raise ValueError('existing installation differs; explicit migration required, no data deletion')
@@ -116,11 +124,14 @@ def install(folder,quota=None,registry_user=None):
     if info['Id']!=plan['image_id']:raise ValueError('local image does not match the admitted bundle; load its images archive')
   compose=read(folder/'compose.json');project='caribou-client-'+profile['client_id']
   if compose['name']!=project:raise ValueError('bundle project mismatch')
+  if 'storage' not in selected:
+   for name in ['edge','broker','reconstructor']:compose['services'].pop(name,None)
   for cid in command(['docker','ps','-aq','--filter','label=com.docker.compose.project='+project]).split():
    label=command(['docker','inspect','--format','{{index .Config.Labels "caribou.client"}}',cid])
    if label!=profile['client_id']:raise ValueError('refusing to replace an unrelated container')
   # Freeze admitted identity/quota before any data-bearing container starts.
   write(old,state)
+  write(folder/'compose.json',compose)
   if 'storage' in selected:
    cfg=read(runtime/'config.json');node=profile['node_id'];spec=next(n for n in cfg['nodes'] if n['id']==node);spec['quota_bytes']=limit;write(runtime/'config.json',cfg)
    command(['docker','compose','--project-directory',str(folder),'-f',str(folder/'compose.json'),'up','-d','broker','reconstructor'],timeout=180)

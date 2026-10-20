@@ -51,6 +51,8 @@ class SecureClientTests(unittest.TestCase):
   out=self.bundle('storage,publisher',node='PI1',owners=[self.owner]);c=sc.read(out/'compose.json')
   self.assertEqual(set(c['services']),{'edge','broker','reconstructor','owner','portal'})
   self.assertEqual(c['services']['edge']['image'],'test:control')
+  self.assertIn('CHOWN',c['services']['broker']['cap_add'])
+  self.assertIn('SETUID',c['services']['broker']['cap_add'])
   self.assertTrue((out/'provision-tenant.ps1').is_file())
   self.assertFalse((out/'.runtime/pki/authority').exists())
   self.assertFalse((out/'.runtime/pki/admin').exists())
@@ -65,6 +67,34 @@ class SecureClientTests(unittest.TestCase):
   self.assertEqual(len(cfg['nodes']),1)
   for node,zone,quota in [('PI1','A',2**30),('JULES1','UNKNOWN',2**30),('JULES1','A',0)]:
    with self.assertRaises(ValueError):admit(cfg,node,zone,quota)
+
+ def test_admission_recreates_go_services_even_if_compose_hash_unchanged(self):
+  import contextlib,io,runpy,sys
+  module=runpy.run_path(str(sc.HERE/'admit-storage.py'));main=module['main'];calls=[]
+  compose=self.root/'compose.json'
+  sc.write(compose,{'services':{name:{} for name in ['central','zone-a','zone-b','broker','broker-a','broker-b']}})
+  argv=['admit-storage.py','--runtime',str(self.runtime),'--compose',str(compose),'--control-image','test:control','--node','JULES1','--zone','A','--maximum-gib','1','--apply']
+  with patch.object(sys,'argv',argv),patch.dict(main.__globals__,{'command':lambda args,**kw:calls.append(args) or ''}),contextlib.redirect_stdout(io.StringIO()):main()
+  startups=[call for call in calls if 'up' in call]
+  self.assertEqual(len(startups),2)
+  for call in startups:self.assertIn('--force-recreate',call)
+  self.assertTrue(any(p.name.startswith('config-before-') for p in self.runtime.iterdir()))
+
+ def test_zero_quota_starts_no_storage_or_tenant_provisioner(self):
+  out=self.bundle('storage,publisher',node='PI1',owners=[self.owner]);calls=[]
+  def docker(args,**kw):
+   calls.append(args)
+   if args[1:3]==['compose','version']:return '2.40.0'
+   if args[1]=='info':return 'linux/amd64'
+   if args[1:3]==['image','inspect']:return json.dumps([{'Id':'sha256:fixture'}])
+   if args[1]=='ps':return ''
+   if args[1]=='compose':return ''
+   self.fail('unexpected provisioning command: '+str(args))
+  with patch.object(sc,'command',side_effect=docker):result=sc.install(out,0)
+  self.assertNotIn('storage',result['roles'])
+  self.assertEqual(set(sc.read(out/'compose.json')['services']),{'portal','owner'})
+  self.assertEqual(sc.read(out/'.runtime/installation.json')['quota_bytes'],0)
+  self.assertFalse(any(call[0]=='pwsh' or 'reconstructor' in call for call in calls))
 
  def test_installed_quota_cannot_be_silently_changed(self):
   out=self.bundle('storage',node='PI1',owners=[self.owner])

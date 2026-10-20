@@ -29,10 +29,16 @@ def main():
  p.add_argument('--override',action='append',type=Path,default=[])
  p.add_argument('--control-image',required=True);p.add_argument('--node',required=True);p.add_argument('--zone',required=True)
  p.add_argument('--maximum-gib',type=float,required=True);p.add_argument('--apply',action='store_true')
+ p.add_argument('--additional',action='append',default=[],metavar='NODE:ZONE:MAX_GIB',help='batch explicit admissions in one controller reload')
  a=p.parse_args();runtime=a.runtime.resolve();base=a.compose.resolve();cfg=read(runtime/'config.json')
  maximum=int(a.maximum_gib*2**30);value=admitted_config(cfg,a.node,a.zone,maximum)
+ for extra in a.additional:
+  parts=extra.split(':')
+  if len(parts)!=3:raise ValueError('additional node format: NODE:ZONE:MAX_GIB')
+  value=admitted_config(value,parts[0],parts[1],int(float(parts[2])*2**30))
+ additions=value['nodes'][len(cfg['nodes']):]
  if not a.apply:
-  print(json.dumps({'mode':'PLAN_ONLY','new_node':value['nodes'][-1],'existing_nodes_preserved':[n['id'] for n in cfg['nodes']]}));return
+  print(json.dumps({'mode':'PLAN_ONLY','new_nodes':additions,'existing_nodes_preserved':[n['id'] for n in cfg['nodes']]}));return
  for path in [base,*a.override]:
   if not path.is_file():raise ValueError('missing compose overlay: '+str(path))
  backup=runtime/('config-before-'+str(time.time_ns())+'.json');shutil.copy2(runtime/'config.json',backup)
@@ -45,11 +51,13 @@ def main():
  for path in [*a.override,overlay]:command_base+=['-f',str(path.resolve())]
  # Reload config and explicit endpoint allowlists; all volumes/certificates stay.
  names=[n for n in ['central','zone-a','zone-b',*changed] if n in services and not n.startswith('test-')]
- command(command_base+['up','-d','--no-deps','--wait','--wait-timeout','180',*names],timeout=240)
+ # Config files do not change the Compose service hash. Recreate explicitly:
+ # Go reads topology at startup, and bind mounts may still reference old inodes.
+ command(command_base+['up','-d','--no-deps','--force-recreate','--wait','--wait-timeout','180',*names],timeout=240)
  # Brokers copy ACLs on startup, so existing brokers must refresh their ACLs.
  brokers=[n for n in ['broker','broker-a','broker-b'] if n in services]
  command(command_base+['up','-d','--no-deps','--force-recreate','--wait',*brokers],timeout=180)
- print(json.dumps({'admitted_node':a.node,'zone':a.zone,'maximum_quota_bytes':maximum,'backup':str(backup),'remote_machine_modified':False,'discovery_and_real_storage_test':'PENDING'}))
+ print(json.dumps({'admitted_nodes':additions,'backup':str(backup),'remote_machine_modified':False,'discovery_and_real_storage_test':'PENDING'}))
 
 
 if __name__=='__main__':

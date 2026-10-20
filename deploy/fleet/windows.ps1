@@ -5,19 +5,27 @@ $profile=Get-Content "$BundleDirectory/profile.json" -Raw|ConvertFrom-Json
 if(Get-Command py -ErrorAction SilentlyContinue){$python='py';$prefix=@('-3','-B')}elseif(Get-Command python -ErrorAction SilentlyContinue){$python='python';$prefix=@('-B')}else{throw 'Python 3.10+ requis. Installer les prérequis avant la séance.'}
 if(-not(Get-Command pwsh -ErrorAction SilentlyContinue)){throw 'PowerShell 7 requis'}
 if($profile.roles -contains 'storage'){
- if($null -eq $QuotaGiB){$QuotaGiB=[double](Read-Host "Quota projet en GiB (maximum $($profile.max_quota_bytes/1GB))")}
+ if($null -eq $QuotaGiB){
+  if(Test-Path "$BundleDirectory/.runtime/installation.json"){$QuotaGiB=[double]((Get-Content "$BundleDirectory/.runtime/installation.json" -Raw|ConvertFrom-Json).quota_bytes/1GB)}
+  else{$inputQuota=(Read-Host "Quota projet en GiB (0 = sans stockage ; exemple 0,5 ; maximum $($profile.max_quota_bytes/1GB))").Replace(',','.');$QuotaGiB=[double]::Parse($inputQuota,[Globalization.CultureInfo]::InvariantCulture)}
+ }
 }
 $argsInstall=@('install','--bundle',$BundleDirectory)
 if($null -ne $QuotaGiB){$argsInstall+=@('--quota-gib',([double]$QuotaGiB).ToString([Globalization.CultureInfo]::InvariantCulture))}
 if($RegistryUser){$argsInstall+=@('--registry-user',$RegistryUser)}
 & $python @prefix "$BundleDirectory/secure_client.py" @argsInstall
 if($LASTEXITCODE -ne 0){throw 'Installation refusée ; volumes conservés'}
-if(($profile.roles -contains 'storage') -and -not $NoDiscovery){
+if(($profile.roles -contains 'storage') -and $QuotaGiB -gt 0 -and -not $NoDiscovery){
  $venv="$BundleDirectory/.runtime/lan-venv";$lanPython="$venv/Scripts/python.exe"
  if(-not(Test-Path $lanPython)){& $python @prefix -m venv $venv;if($LASTEXITCODE -ne 0){throw 'Création Python LAN impossible'}}
  $oldSkip=$env:SKIP_CYTHON
  try{$env:SKIP_CYTHON='1';& $lanPython -m pip install --disable-pip-version-check --no-binary zeroconf -r "$BundleDirectory/lan-requirements.txt";if($LASTEXITCODE -ne 0){throw 'Dépendances LAN indisponibles'}}finally{if($null -eq $oldSkip){Remove-Item Env:SKIP_CYTHON -ErrorAction SilentlyContinue}else{$env:SKIP_CYTHON=$oldSkip}}
- if(-not $InterfaceIPv4){$InterfaceIPv4=(Get-NetIPAddress -InterfaceAlias 'Wi-Fi' -AddressFamily IPv4|Where-Object {$_.AddressState -eq 'Preferred'}|Select-Object -First 1).IPAddress}
+ if(-not $InterfaceIPv4){
+  # Ask Windows which interface routes to the controller. UDP Connect selects
+  # a route/local address without sending a datagram or assuming an adapter name.
+  $socket=[Net.Sockets.Socket]::new([Net.Sockets.AddressFamily]::InterNetwork,[Net.Sockets.SocketType]::Dgram,[Net.Sockets.ProtocolType]::Udp)
+  try{$socket.Connect($profile.controller_ip,19683+$profile.port_offset);$InterfaceIPv4=$socket.LocalEndPoint.Address.IPAddressToString}finally{$socket.Dispose()}
+ }
  if(-not $InterfaceIPv4){throw 'Préciser -InterfaceIPv4 pour annoncer la bonne interface LAN'}
  $stateFile="$BundleDirectory/.runtime/discovery-processes.json"
  if(Test-Path $stateFile){
@@ -39,3 +47,5 @@ if(($profile.roles -contains 'storage') -and -not $NoDiscovery){
 }
 if($profile.roles -contains 'viewer'){Write-Host "Spectateur : $($profile.viewer_url) ; connexion Java habituelle."}
 if($profile.roles -contains 'publisher'){Write-Host "Producteur : $($profile.owner_url) ; puis ./publish.ps1 -Email VOTRE_COMPTE. OBS : $($profile.rtmp_url), clé stream."}
+
+if(Test-Path "$BundleDirectory/account.private.json"){$account=Get-Content "$BundleDirectory/account.private.json" -Raw|ConvertFrom-Json;Write-Host "Compte de démo : $($account.email) ; mot de passe dans account.private.json (ne pas partager).";$account=$null}
