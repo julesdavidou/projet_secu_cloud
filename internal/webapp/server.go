@@ -76,6 +76,7 @@ type metadata struct {
 	Profiles map[string]Profile `json:"profiles"`
 }
 type secureCacheEntry struct {
+	Live                         bool
 	Path, ContentHash, ProofHash string
 	Expires                      time.Time
 }
@@ -209,6 +210,7 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.Handle("/api/auth/", s.authProxy)
 	api := http.NewServeMux()
+	s.liveAPI(api)
 	api.HandleFunc("GET /api/videos", s.list)
 	api.HandleFunc("POST /api/videos", s.upload)
 	api.HandleFunc("POST /api/videos/signed", s.signedUpload)
@@ -227,12 +229,14 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("GET /api/nodes", s.topology)
 	api.HandleFunc("GET /api/zones", s.topology)
 	api.HandleFunc("GET /api/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		live := "requires secure profile and owner publisher"
 		integrity, brokers := "SHA256; legacy SIS/IBS prototype not integrated", "authenticated broker"
 		if controllers.Env("REQUIRE_SIS_IBS", "0") == "1" {
+			live = "signed HLS fragments; /live/; owner publisher required"
 			integrity = "SIS-HESS-BLS12381-v3 + SHA256; local owner signatures required"
 			brokers = "mutual TLS, stable node identities, direct broker links"
 		}
-		controllers.JSON(w, 200, map[string]string{"auth": "Java opaque session", "placement": "Go HRW", "storage": "real-http", "vod": "HLS or native MP4, verified Edge reconstruction", "integrity": integrity, "live": "prototype not integrated", "brokers": brokers})
+		controllers.JSON(w, 200, map[string]string{"auth": "Java opaque session", "placement": "Go HRW", "storage": "real-http", "vod": "HLS or native MP4, verified Edge reconstruction", "integrity": integrity, "live": live, "brokers": brokers})
 	})
 	s.delegatedAPI(mux)
 	mux.Handle("/api/", s.protected(api))

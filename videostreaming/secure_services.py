@@ -238,6 +238,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
    folder=DATA/'outbox';state=json.loads((folder/(video+'.json')).read_text())
    if state['owner_id']!=record['owner']:raise PermissionError('wrong outbox owner')
    return self.reply(201,deliver_publication(record,folder/(video+'.tar'),video))
+  if path.startswith('/owner/live/'):
+   from secure_live import owner_live
+   return owner_live(self,path,record,sys.modules[__name__])
   if path=='/owner/publish':
    raw=self.read()
    if len(raw)>16*1024*1024:raise ValueError('source exceeds secure demo limit')
@@ -257,7 +260,7 @@ def enroll_wallet(record,zone):
   decode_point(share['share']);decode_point(share['public_key'],2)
   wallet['zones'].append({'zone_id':zone,'epoch':share['epoch']});wallet['shares'][zone]=share['share'];atomic(path,wallet);return wallet
 
-def publish(record,raw,query,signer=None,video=None):
+def publish(record,raw,query,signer=None,video=None,live_duration_ms=None):
  if signer:private=signer['key'];zones=signer['zones'];certificate=signer['delegation']
  else:
   wallet=enroll_wallet(record,os.environ.get('OWNER_INITIAL_ZONE','A'));private=aggregate_shares(list(wallet['shares'].values()));zones=wallet['zones'];certificate=None
@@ -265,8 +268,13 @@ def publish(record,raw,query,signer=None,video=None):
  with tempfile.TemporaryDirectory(dir=DATA,prefix='publication-') as folder:
   folder=Path(folder);source=folder/'source.mp4';source.write_bytes(raw);output=folder/'hls'
   env={**os.environ,'VIDEO_BLOCK_PIPELINE':'1','VIDEO_ID':video,'VIDEO_OWNER_ID':record['owner']}
-  subprocess.run(['python','/app/video/segment_upload.py',str(source),str(output)],env=env,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=120)
-  pack=json.loads((output/'package.json').read_text());proofs={};public=query.get('public',['false'])[0]=='true'
+  if live_duration_ms is None:
+   subprocess.run(['python','/app/video/segment_upload.py',str(source),str(output)],env=env,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=120)
+   pack=json.loads((output/'package.json').read_text())
+  else:
+   from secure_live import fragment_package
+   output.mkdir();pack=fragment_package(raw,output,video,live_duration_ms)
+  proofs={};public=query.get('public',['false'])[0]=='true'
   for asset in pack['assets']:
    payloads=[pad_block((output/pack['files'][b['extent_id']]).read_bytes(),asset['block_size']) for b in asset['blocks']]
    proofs[asset['name']]=sign_asset(private,record['owner'],video,asset,payloads,zones,public=public,root_id=root,operation_kind=kind,delegation=certificate)

@@ -1,0 +1,58 @@
+name: Signed live RTMP, Edge HLS and browser measurements
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: live-v4-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  real-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Build and start isolated live project
+        shell: pwsh
+        run: ./deploy/live-v4/start.ps1
+      - name: Real crypto and live format contracts
+        run: docker compose --project-directory deploy/live-v4 -f deploy/live-v4/.runtime/compose.json exec -T owner-a python -m unittest test_live test_secure_sis test_secure_operations test_publication_retry -v
+      - name: Preserve existing signed VOD, real two-zone storage and two owners
+        shell: pwsh
+        run: ./deploy/live-v4/smoke.ps1
+      - name: Install pinned browser test runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/live-browser" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/live-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Real-time RTMP, actual browser frames and exported measurements
+        env:
+          NODE_PATH: ${{ runner.temp }}/live-browser/node_modules
+        run: |
+          node deploy/live-v4/browser-check.cjs
+          docker compose --project-directory deploy/live-v4 -f deploy/live-v4/.runtime/compose.json cp owner-a:/data/test-results/live.json deploy/live-v4/results/live.json
+      - name: Actual corruption/absence restoration and full durable restart
+        shell: pwsh
+        run: ./deploy/live-v4/resilience.ps1
+      - name: Diagnostics
+        if: always()
+        run: docker compose --project-directory deploy/live-v4 -f deploy/live-v4/.runtime/compose.json logs --no-color --tail 30
+      - name: Non-secret evidence and actual browser screenshot
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: signed-live-${{ github.sha }}
+          path: |
+            deploy/live-v4/results/*.json
+            deploy/live-v4/results/*.png
+            deploy/live-v4/results/live-publisher.log
+      - name: Stop disposable live CI project without deleting volumes
+        if: always()
+        run: |
+          docker compose --project-directory deploy/live-v4 -f deploy/live-v4/.runtime/compose.json down
+          ids=$(docker ps -aq --filter label=caribou.project=caribou-live-v4)
+          if [ -n "$ids" ]; then docker stop $ids; fi

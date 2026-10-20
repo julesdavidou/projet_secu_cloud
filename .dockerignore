@@ -26,3 +26,7 @@ deploy/edge-v2/results/
 
 deploy/secure-v3/.runtime/
 deploy/secure-v3/results/
+
+# Independent signed live lab
+deploy/live-v4/.runtime/
+deploy/live-v4/results/

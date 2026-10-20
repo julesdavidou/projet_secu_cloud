@@ -1,0 +1,8 @@
+{
+  "physical_lab": "NOT_TESTED",
+  "corruption": "REFUSED_AND_RESTORED",
+  "absence": "REFUSED_AND_RESTORED",
+  "restart": "SAME_HEAD_ORDER_END_PRIVACY_AND_BYTES",
+  "live_id": "l-037651547e10f38ef19163f444152a2b",
+  "passed": true
+}

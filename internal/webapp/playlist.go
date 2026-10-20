@@ -15,6 +15,14 @@ func validateSignedPlaylist(m Movie) error {
 	if m.LayoutVersion != 3 {
 		return nil
 	}
+	// Live fragments are a single signed standalone init+fragment MP4. They
+	// never enter the FFmpeg playlist path. Do not relax normal VOD validation.
+	if strings.HasPrefix(m.RootID, "l-") && strings.HasPrefix(m.OperationKind, "live_segment-") {
+		if !m.NativeSource || m.Playlist != "" || len(m.Assets) != 1 || m.Assets[0].Name != "original.mp4" {
+			return errors.New("single signed live fragment required")
+		}
+		return nil
+	}
 	assets := map[string]bool{}
 	for _, a := range m.Assets {
 		if a.Name == "index.m3u8" || a.Name == "playback.mp4" {

@@ -12,7 +12,7 @@ export function renderHeader(profile, route) {
   const active = name => route.name === name || (name === "catalogue" && route.name === "video");
   return `<div class="header-inner container">
     <a class="brand" href="#/accueil" aria-label="CaribouTV, accueil">Caribou<span>TV</span></a>
-    <nav class="site-nav" aria-label="Navigation principale">
+    <nav class="site-nav" aria-label="Navigation principale"><a href="/live/">Direct</a>
       <a href="#/accueil" ${active("accueil") ? 'aria-current="page"' : ""}>Accueil</a>
       <a href="#/catalogue" ${active("catalogue") ? 'aria-current="page"' : ""}>Catalogue</a>
       <a class="desktop-category-link" href="#/categories" ${active("categories") ? 'aria-current="page"' : ""}>Catégories</a>
