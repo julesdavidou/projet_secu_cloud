@@ -1,0 +1,39 @@
+name: Edge MQTT and reconstruction V2
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  edge-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Go contracts, race and vet in all modules
+        run: docker build -f deploy/lab/Dockerfile --target verify .
+      - name: Build and provision isolated mixed MQTT3/5 stack
+        shell: pwsh
+        run: ./deploy/edge-v2/start.ps1
+      - name: Python contracts and prototype SIS binding
+        run: docker run --rm -v "$PWD/videostreaming:/tests:ro" -w /tests caribou/edge-v2-reader:dev python -m unittest discover -p 'test_*.py' -v
+      - name: Existing user rights, actual upload and byte-identical original
+        shell: pwsh
+        run: ./deploy/edge-v2/smoke.ps1
+      - name: Real multizone storage, mixed brokers and logical mobility
+        shell: pwsh
+        run: ./deploy/edge-v2/network-smoke.ps1
+      - name: Missing/corrupt files, broker reconnection and durable restart
+        shell: pwsh
+        run: ./deploy/edge-v2/resilience.ps1
+      - name: Logs
+        if: always()
+        run: docker compose -f deploy/edge-v2/compose.yaml logs --no-color --tail 70
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: edge-v2-${{ github.sha }}
+          path: deploy/edge-v2/results/*.json
+      - name: Stop only disposable CI services
+        if: always()
+        run: docker compose -f deploy/edge-v2/compose.yaml down

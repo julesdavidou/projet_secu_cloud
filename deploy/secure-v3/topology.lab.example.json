@@ -1,0 +1,64 @@
+{
+  "zones": [
+    "A",
+    "B"
+  ],
+  "node_ttl_seconds": 5,
+  "lease_seconds": 300,
+  "fanout": 2,
+  "nodes": [
+    {
+      "id": "A1",
+      "zone": "A",
+      "quota_bytes": 268435456,
+      "endpoint": "https://edge-a:8443",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 1000000,
+      "broker_hostname": "broker-a",
+      "reconstructor_hostname": "reconstructor-a"
+    },
+    {
+      "id": "B1",
+      "zone": "B",
+      "quota_bytes": 268435456,
+      "endpoint": "https://edge-b:8443",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 600000,
+      "broker_hostname": "broker-b",
+      "reconstructor_hostname": "reconstructor-b"
+    },
+    {
+      "id": "PI1",
+      "zone": "A",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "quota_bytes": 268435456,
+      "endpoint": "https://edge-PI1:8443",
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 500000
+    },
+    {
+      "id": "JETSON1",
+      "zone": "B",
+      "allowed_zones": [
+        "A",
+        "B"
+      ],
+      "quota_bytes": 268435456,
+      "endpoint": "https://edge-JETSON1:8443",
+      "mode": "real-http",
+      "microcredits_per_gib_hour": 500000
+    }
+  ],
+  "discovery_enabled": true
+}

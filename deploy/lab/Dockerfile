@@ -9,7 +9,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 FROM source AS builder
 ARG TARGETOS
 ARG TARGETARCH
-RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/ ./cmd/central-controller ./cmd/edge-bridge ./cmd/edge-agent ./cmd/lab-admin
+RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/ ./cmd/central-controller ./cmd/edge-bridge ./cmd/edge-agent ./cmd/lab-admin ./cmd/tls-run
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build cd serveur-zone && CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /out/serveur-zone ./app
 FROM alpine:3.22 AS runtime
 RUN addgroup -g 10001 -S caribou && adduser -u 10001 -S -G caribou caribou && mkdir /data && chown caribou:caribou /data

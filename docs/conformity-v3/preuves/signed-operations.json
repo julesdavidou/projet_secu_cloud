@@ -1,0 +1,25 @@
+{
+  "root_id": "v-6156a02bee73c3e199099ff789d19442",
+  "owner_id": "client-6f560c70-d77d-46ed-a28e-db99343a71b3",
+  "last_content_id": "v-69524a8b7238112597c9deb56cb25b9c",
+  "last_source_sha256": "9dfe389630eb7ef8d272bae7eab3f56f586602c52b72b3566d2ff2c9f23198bb",
+  "last_source_size": 375173,
+  "final_state": {
+    "commit": "35e11f0d11a669235d9ae6c73067db23e368dd9126fb9ffd79a49819b09532ee",
+    "current_video_id": "v-69524a8b7238112597c9deb56cb25b9c",
+    "deleted": true,
+    "owner_id": "client-6f560c70-d77d-46ed-a28e-db99343a71b3",
+    "public": false,
+    "revision": 10,
+    "root_id": "v-6156a02bee73c3e199099ff789d19442"
+  },
+  "concurrent_first_submission": "PASS",
+  "delegated_block_edits": "REAL",
+  "revoked_grant_id": "1014b322a1b2aed28257ec6431c280d97e0f8e7feb949c98b47088d4a58cb514",
+  "scoped_refusal": "PASS",
+  "revocation": "PASS",
+  "expiry": "PASS",
+  "cached_access_revoked": "PASS",
+  "physical_reclamation": "NOT_REQUESTED; old immutable bytes retained and charged",
+  "physical_lab": "NOT_TESTED"
+}

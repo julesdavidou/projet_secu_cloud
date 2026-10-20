@@ -1,0 +1,695 @@
+{
+  "name": "caribou-secure-v3",
+  "services": {
+    "broker": {
+      "image": "eclipse-mosquitto:2.0.22",
+      "entrypoint": [
+        "/bin/sh",
+        "/entrypoint.sh"
+      ],
+      "restart": "unless-stopped",
+      "volumes": [
+        "./broker-entrypoint.sh:/entrypoint.sh:ro",
+        "./broker.conf:/config/broker.conf:ro",
+        "./.runtime/broker:/provision:ro",
+        "./.runtime/pki/broker:/run/tls:ro",
+        "broker-data:/mosquitto/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "nc -z 127.0.0.1 8883"
+        ],
+        "interval": "2s",
+        "timeout": "2s",
+        "retries": 40
+      }
+    },
+    "broker-a": {
+      "image": "eclipse-mosquitto:2.0.22",
+      "entrypoint": [
+        "/bin/sh",
+        "/entrypoint.sh"
+      ],
+      "restart": "unless-stopped",
+      "volumes": [
+        "./broker-entrypoint.sh:/entrypoint.sh:ro",
+        "./broker-a.conf:/config/broker.conf:ro",
+        "./.runtime/broker:/provision:ro",
+        "./.runtime/pki/broker-A1:/run/tls:ro",
+        "broker-a-data:/mosquitto/data",
+        "./.runtime/pki/edge-A1:/run/bridge-tls:ro",
+        "./.runtime/lan-A1:/discovery:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "nc -z 127.0.0.1 8883"
+        ],
+        "interval": "2s",
+        "timeout": "2s",
+        "retries": 40
+      },
+      "environment": {
+        "BRIDGE_NODE_ID": "A1"
+      }
+    },
+    "broker-b": {
+      "image": "eclipse-mosquitto:2.0.22",
+      "entrypoint": [
+        "/bin/sh",
+        "/entrypoint.sh"
+      ],
+      "restart": "unless-stopped",
+      "volumes": [
+        "./broker-entrypoint.sh:/entrypoint.sh:ro",
+        "./broker-b.conf:/config/broker.conf:ro",
+        "./.runtime/broker:/provision:ro",
+        "./.runtime/pki/broker-B1:/run/tls:ro",
+        "broker-b-data:/mosquitto/data",
+        "./.runtime/pki/edge-B1:/run/bridge-tls:ro",
+        "./.runtime/lan-B1:/discovery:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "nc -z 127.0.0.1 8883"
+        ],
+        "interval": "2s",
+        "timeout": "2s",
+        "retries": 40
+      },
+      "environment": {
+        "BRIDGE_NODE_ID": "B1"
+      }
+    },
+    "central": {
+      "image": "caribou/secure-v3-control:dev",
+      "command": [
+        "tls-run",
+        "central-controller"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "SECRETS_DIR": "/run/lab-secrets",
+        "MQTT_BROKER": "tls://broker:8883",
+        "MQTT_JSON_ENVELOPE": "1",
+        "HTTP_ADDR": "127.0.0.1:8088",
+        "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
+        "DB_PATH": "/data/central.db",
+        "TLS_ALLOWED_PEERS": "web,zone-*,admin,edge-*",
+        "SECURITY_OPERATION_VERIFY_URL": "https://is-a:8443"
+      },
+      "volumes": [
+        "./.runtime/config.json:/config/config.json:ro",
+        "./.runtime/identities/central:/run/lab-secrets:ro",
+        "./.runtime/pki/central:/run/tls:ro",
+        "central-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8088/ready"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40
+      },
+      "depends_on": {
+        "broker": {
+          "condition": "service_healthy"
+        }
+      },
+      "build": {
+        "context": "../..",
+        "dockerfile": "deploy/lab/Dockerfile",
+        "target": "runtime"
+      },
+      "ports": [
+        "127.0.0.1:19688:8443"
+      ]
+    },
+    "zone-a": {
+      "image": "caribou/secure-v3-control:dev",
+      "command": [
+        "tls-run",
+        "serveur-zone"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "SECRETS_DIR": "/run/lab-secrets",
+        "MQTT_BROKER": "tls://broker:8883",
+        "MQTT_JSON_ENVELOPE": "1",
+        "HTTP_ADDR": "127.0.0.1:8088",
+        "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
+        "ZONE_ID": "A",
+        "PLACEMENT_ENABLED": "1",
+        "APP_PORT": "8080",
+        "ZONE_DB_PATH": "/data/zone.db",
+        "LEDGER_PATH": "/data/controller-ledger.json",
+        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,web,admin,owner-*",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/config.json:/config/config.json:ro",
+        "./.runtime/identities/zone-A:/run/lab-secrets:ro",
+        "./.runtime/pki/zone-A:/run/tls:ro",
+        "zone-a-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8088/ready"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40
+      },
+      "depends_on": {
+        "central": {
+          "condition": "service_healthy"
+        }
+      },
+      "ports": [
+        "127.0.0.1:19691:8443"
+      ]
+    },
+    "zone-b": {
+      "image": "caribou/secure-v3-control:dev",
+      "command": [
+        "tls-run",
+        "serveur-zone"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "SECRETS_DIR": "/run/lab-secrets",
+        "MQTT_BROKER": "tls://broker:8883",
+        "MQTT_JSON_ENVELOPE": "1",
+        "HTTP_ADDR": "127.0.0.1:8088",
+        "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
+        "ZONE_ID": "B",
+        "PLACEMENT_ENABLED": "1",
+        "APP_PORT": "8080",
+        "ZONE_DB_PATH": "/data/zone.db",
+        "LEDGER_PATH": "/data/controller-ledger.json",
+        "TLS_ALLOWED_PEERS": "central,zone-*,edge-*,web,admin,owner-*",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/config.json:/config/config.json:ro",
+        "./.runtime/identities/zone-B:/run/lab-secrets:ro",
+        "./.runtime/pki/zone-B:/run/tls:ro",
+        "zone-b-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8088/ready"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40
+      },
+      "depends_on": {
+        "central": {
+          "condition": "service_healthy"
+        }
+      },
+      "ports": [
+        "127.0.0.1:19692:8443"
+      ]
+    },
+    "edge-a": {
+      "image": "caribou/secure-v3-control:dev",
+      "command": [
+        "tls-run",
+        "edge-agent"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "SECRETS_DIR": "/run/lab-secrets",
+        "MQTT_BROKER": "tls://broker-a:8883",
+        "MQTT_JSON_ENVELOPE": "1",
+        "HTTP_ADDR": "127.0.0.1:8088",
+        "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
+        "MQTT_PROTOCOL": "3.1.1",
+        "EDGE_ID": "A1",
+        "EDGE_ZONE": "A",
+        "EDGE_CONTROL_ENABLED": "1",
+        "EDGE_MODE": "real-http",
+        "EDGE_BACKEND_URL": "http://127.0.0.1:8080",
+        "EDGE_RECONSTRUCTOR_URL": "https://reconstructor-a:8443",
+        "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
+        "STORAGE_ROOT": "/data/files",
+        "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-A1.http-token",
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,zone-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/config.json:/config/config.json:ro",
+        "./.runtime/identities/edge-A1:/run/lab-secrets:ro",
+        "./.runtime/pki/edge-A1:/run/tls:ro",
+        "edge-a-data:/data",
+        "./.runtime/tenant-A1:/run/tenant-backends:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8088/ready"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40
+      },
+      "depends_on": {
+        "broker-a": {
+          "condition": "service_healthy"
+        },
+        "zone-a": {
+          "condition": "service_healthy"
+        },
+        "zone-b": {
+          "condition": "service_healthy"
+        },
+        "reconstructor-a": {
+          "condition": "service_healthy"
+        }
+      },
+      "ports": [
+        "127.0.0.1:19681:8443"
+      ]
+    },
+    "edge-b": {
+      "image": "caribou/secure-v3-control:dev",
+      "command": [
+        "tls-run",
+        "edge-agent"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "SECRETS_DIR": "/run/lab-secrets",
+        "MQTT_BROKER": "tls://broker-b:8883",
+        "MQTT_JSON_ENVELOPE": "1",
+        "HTTP_ADDR": "127.0.0.1:8088",
+        "CONTROLLER_HTTP_ADDR": "127.0.0.1:8088",
+        "MQTT_PROTOCOL": "5",
+        "EDGE_ID": "B1",
+        "EDGE_ZONE": "B",
+        "EDGE_CONTROL_ENABLED": "1",
+        "EDGE_MODE": "real-http",
+        "EDGE_BACKEND_URL": "http://127.0.0.1:8080",
+        "EDGE_RECONSTRUCTOR_URL": "https://reconstructor-b:8443",
+        "EDGE_LEDGER_PATH": "/data/control/edge-ledger.json",
+        "STORAGE_ROOT": "/data/files",
+        "HTTP_AUTH_TOKEN_FILE": "/run/lab-secrets/edge-B1.http-token",
+        "TLS_ALLOWED_PEERS": "web,edge-*,reconstructor-*,zone-*,admin",
+        "STORAGE_BACKENDS_FILE": "/run/tenant-backends/tenants.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/config.json:/config/config.json:ro",
+        "./.runtime/identities/edge-B1:/run/lab-secrets:ro",
+        "./.runtime/pki/edge-B1:/run/tls:ro",
+        "edge-b-data:/data",
+        "./.runtime/tenant-B1:/run/tenant-backends:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD-SHELL",
+          "wget -q -O - http://127.0.0.1:8088/ready"
+        ],
+        "interval": "3s",
+        "timeout": "3s",
+        "retries": 40
+      },
+      "depends_on": {
+        "broker-b": {
+          "condition": "service_healthy"
+        },
+        "zone-a": {
+          "condition": "service_healthy"
+        },
+        "zone-b": {
+          "condition": "service_healthy"
+        },
+        "reconstructor-b": {
+          "condition": "service_healthy"
+        }
+      },
+      "ports": [
+        "127.0.0.1:19682:8443"
+      ]
+    },
+    "is-a": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "authority",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "ZONE_ID": "A"
+      },
+      "volumes": [
+        "./.runtime/pki/authority-A:/run/tls:ro",
+        "is-a-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      },
+      "build": {
+        "context": "../..",
+        "dockerfile": "deploy/secure-v3/Dockerfile.security"
+      }
+    },
+    "is-b": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "authority",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "ZONE_ID": "B"
+      },
+      "volumes": [
+        "./.runtime/pki/authority-B:/run/tls:ro",
+        "is-b-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      }
+    },
+    "owner-a": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "owner",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "OWNER_INITIAL_ZONE": "A",
+        "OWNER_BROWSER_ORIGIN": "http://localhost:19591",
+        "DELEGATE_WORKERS": "{\"reconstructor-A1\":\"https://reconstructor-A1:8443\",\"reconstructor-B1\":\"https://reconstructor-B1:8443\"}",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/pki/owner-a:/run/tls:ro",
+        "owner-a-data:/data",
+        "./.runtime/config.json:/config/config.json:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      },
+      "ports": [
+        "127.0.0.1:19591:9300"
+      ]
+    },
+    "owner-b": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "owner",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "OWNER_INITIAL_ZONE": "B",
+        "OWNER_BROWSER_ORIGIN": "http://localhost:19592",
+        "DELEGATE_WORKERS": "{\"reconstructor-A1\":\"https://reconstructor-A1:8443\",\"reconstructor-B1\":\"https://reconstructor-B1:8443\"}",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/pki/owner-b:/run/tls:ro",
+        "owner-b-data:/data",
+        "./.runtime/config.json:/config/config.json:ro"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      },
+      "ports": [
+        "127.0.0.1:19592:9300"
+      ]
+    },
+    "reconstructor-a": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "worker",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "DELEGATE_ID": "reconstructor-A1"
+      },
+      "volumes": [
+        "./.runtime/pki/reconstructor-A1:/run/tls:ro",
+        "reconstructor-a-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      },
+      "networks": {
+        "default": {
+          "aliases": [
+            "reconstructor-A1"
+          ]
+        }
+      }
+    },
+    "reconstructor-b": {
+      "image": "caribou/secure-v3-security:dev",
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "512m",
+      "cpus": 1.0,
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "SECURITY_ROLE": "worker",
+        "AUTH_URL": "https://auth:8443",
+        "WEB_URL": "https://web:8443",
+        "TRUSTED_IS_URLS": "{\"A\":\"https://is-a:8443\",\"B\":\"https://is-b:8443\"}",
+        "ALLOWED_EDGE_ORIGINS": "https://edge-a:8443,https://edge-b:8443",
+        "DELEGATE_ID": "reconstructor-B1"
+      },
+      "volumes": [
+        "./.runtime/pki/reconstructor-B1:/run/tls:ro",
+        "reconstructor-b-data:/data"
+      ],
+      "healthcheck": {
+        "test": [
+          "CMD",
+          "python",
+          "-c",
+          "import os,ssl,urllib.request;c=ssl.create_default_context(cafile=os.environ['TLS_CA_FILE']);c.load_cert_chain(os.environ['TLS_CERT_FILE'],os.environ['TLS_KEY_FILE']);urllib.request.urlopen('https://127.0.0.1:8443/health',context=c,timeout=3)"
+        ],
+        "interval": "3s",
+        "timeout": "5s",
+        "retries": 40
+      },
+      "networks": {
+        "default": {
+          "aliases": [
+            "reconstructor-B1"
+          ]
+        }
+      }
+    },
+    "auth": {
+      "image": "caribou/secure-v3-auth:dev",
+      "build": {
+        "context": "../..",
+        "dockerfile": "deploy/secure-v3/Dockerfile.auth"
+      },
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "TLS_ALLOWED_PEERS": "web,authority-*,owner-*,reconstructor-*",
+        "TLS_UPSTREAM": "http://127.0.0.1:8082"
+      },
+      "volumes": [
+        "./.runtime/pki/auth:/run/tls:ro",
+        "auth-data:/data"
+      ],
+      "restart": "unless-stopped"
+    },
+    "web": {
+      "image": "caribou/secure-v3-web:dev",
+      "build": {
+        "context": "../..",
+        "dockerfile": "deploy/secure-v3/Dockerfile.web"
+      },
+      "command": [
+        "tls-run",
+        "web-api"
+      ],
+      "restart": "unless-stopped",
+      "init": true,
+      "mem_limit": "1g",
+      "environment": {
+        "TLS_CA_FILE": "/run/tls/ca.crt",
+        "TLS_CERT_FILE": "/run/tls/tls.crt",
+        "TLS_KEY_FILE": "/run/tls/tls.key",
+        "TLS_UPSTREAM": "http://127.0.0.1:8080",
+        "TLS_ALLOWED_PEERS": "owner-*,admin,reconstructor-*",
+        "CENTRAL_URL": "https://central:8443",
+        "AUTH_URL": "https://auth:8443",
+        "UPLOAD_SOURCE_NODE": "A1",
+        "WEB_BLOCK_PIPELINE": "1",
+        "REQUIRE_SIS_IBS": "1",
+        "SECURITY_VERIFY_URL": "https://is-a:8443",
+        "CONTROLLERS_CONFIG": "/config/config.json",
+        "DISCOVERY_ZONE_URLS": "https://zone-a:8443,https://zone-b:8443"
+      },
+      "volumes": [
+        "./.runtime/pki/web:/run/tls:ro",
+        "./.runtime/operator:/run/web-secrets:ro",
+        "./.runtime/config.json:/config/config.json:ro",
+        "web-data:/data"
+      ],
+      "ports": [
+        "127.0.0.1:19690:8080"
+      ],
+      "depends_on": {
+        "auth": {
+          "condition": "service_healthy"
+        },
+        "central": {
+          "condition": "service_healthy"
+        },
+        "edge-a": {
+          "condition": "service_healthy"
+        },
+        "edge-b": {
+          "condition": "service_healthy"
+        },
+        "is-a": {
+          "condition": "service_healthy"
+        },
+        "is-b": {
+          "condition": "service_healthy"
+        }
+      }
+    }
+  },
+  "volumes": {
+    "broker-data": {},
+    "broker-a-data": {},
+    "broker-b-data": {},
+    "central-data": {},
+    "zone-a-data": {},
+    "zone-b-data": {},
+    "edge-a-data": {},
+    "edge-b-data": {},
+    "is-a-data": {},
+    "is-b-data": {},
+    "owner-a-data": {},
+    "owner-b-data": {},
+    "reconstructor-a-data": {},
+    "reconstructor-b-data": {},
+    "auth-data": {},
+    "web-data": {}
+  }
+}

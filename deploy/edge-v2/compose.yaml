@@ -1,0 +1,231 @@
+name: caribou-edge-v2
+x-control: &control
+  image: caribou/edge-v2-control:dev
+  restart: unless-stopped
+  init: true
+  networks: [control]
+  environment: &env
+    CONTROLLERS_CONFIG: /config/config.json
+    SECRETS_DIR: /run/lab-secrets
+    MQTT_BROKER: mqtt://broker:1883
+    MQTT_JSON_ENVELOPE: '1'
+  depends_on:
+    broker: {condition: service_healthy}
+services:
+  broker:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    ports: ["${V2_BIND_IP:-127.0.0.1}:${V2_MQTT_PORT:-1886}:1883"]
+    entrypoint: [/bin/sh, /entrypoint.sh]
+    volumes:
+      - ../lab/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../lab/config/broker-entrypoint.sh:/entrypoint.sh:ro
+      - ./.runtime/broker:/provision:ro
+      - hub-data:/mosquitto/data
+    healthcheck: &broker-health
+      test: [CMD-SHELL, 'nc -z 127.0.0.1 1883']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [control]
+  central:
+    <<: *control
+    build: {context: ../.., dockerfile: deploy/lab/Dockerfile, target: runtime}
+    command: [central-controller]
+    ports: ["${V2_BIND_IP:-127.0.0.1}:${V2_CENTRAL_PORT:-19288}:8088"]
+    environment:
+      <<: *env
+      DB_PATH: /data/central.db
+    volumes:
+      - ./.runtime/config.json:/config/config.json:ro
+      - ./.runtime/identities/central:/run/lab-secrets:ro
+      - central-data:/data
+  zone-a:
+    <<: *control
+    command: [serveur-zone]
+    environment:
+      <<: *env
+      ZONE_ID: A
+      PLACEMENT_ENABLED: '1'
+      APP_PORT: '8080'
+      ZONE_DB_PATH: /data/zone.db
+      LEDGER_PATH: /data/controller-ledger.json
+    depends_on:
+      central: {condition: service_healthy}
+    volumes:
+      - ./.runtime/config.json:/config/config.json:ro
+      - ./.runtime/identities/zone-A:/run/lab-secrets:ro
+      - zone-a-data:/data
+  broker-a:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /entrypoint.sh]
+    volumes:
+      - ./broker-entrypoint.sh:/entrypoint.sh:ro
+      - ./.runtime/broker-edge-A1:/provision:ro
+      - broker-a-data:/mosquitto/data
+    depends_on:
+      broker: {condition: service_healthy}
+    healthcheck: *broker-health
+    networks: [control]
+  edge-a:
+    <<: *control
+    command: [edge-agent]
+    environment:
+      <<: *env
+      MQTT_BROKER: mqtt://broker-a:1883
+      MQTT_PROTOCOL: 3.1.1
+      EDGE_ID: A1
+      EDGE_ZONE: A
+      EDGE_CONTROL_ENABLED: '1'
+      EDGE_MODE: real-http
+      EDGE_BACKEND_URL: http://127.0.0.1:8080
+      EDGE_RECONSTRUCTOR_URL: http://reconstructor-a:9200
+      EDGE_LEDGER_PATH: /data/control/edge-ledger.json
+      STORAGE_ROOT: /data/files
+      HTTP_AUTH_TOKEN_FILE: /run/lab-secrets/edge-A1.http-token
+    depends_on:
+      broker-a: {condition: service_healthy}
+      zone-a: {condition: service_healthy}
+      zone-b: {condition: service_healthy}
+      reconstructor-a: {condition: service_healthy}
+    ports: ["${V2_BIND_IP:-127.0.0.1}:${V2_EDGE_A_PORT:-19281}:8088"]
+    volumes:
+      - ./.runtime/config.json:/config/config.json:ro
+      - ./.runtime/identities/edge-A1:/run/lab-secrets:ro
+      - edge-a-data:/data
+  reconstructor-a:
+    image: caribou/edge-v2-reader:dev
+    build: {context: ../../videostreaming, dockerfile: Dockerfile}
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      WORKER_TOKEN_FILE: /run/identity/edge-A1.http-token
+      ALLOWED_EDGE_ORIGINS: http://edge-a:8088,http://edge-b:8088
+      WORKERS: '1'
+      PREFETCH: '0'
+    volumes:
+      - ./.runtime/identities/edge-A1:/run/identity:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9200/health',timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [control]
+  zone-b:
+    <<: *control
+    command: [serveur-zone]
+    environment:
+      <<: *env
+      ZONE_ID: B
+      PLACEMENT_ENABLED: '1'
+      APP_PORT: '8080'
+      ZONE_DB_PATH: /data/zone.db
+      LEDGER_PATH: /data/controller-ledger.json
+    depends_on:
+      central: {condition: service_healthy}
+    volumes:
+      - ./.runtime/config.json:/config/config.json:ro
+      - ./.runtime/identities/zone-B:/run/lab-secrets:ro
+      - zone-b-data:/data
+  broker-b:
+    image: eclipse-mosquitto:2.0.22
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /entrypoint.sh]
+    volumes:
+      - ./broker-entrypoint.sh:/entrypoint.sh:ro
+      - ./.runtime/broker-edge-B1:/provision:ro
+      - broker-b-data:/mosquitto/data
+    depends_on:
+      broker: {condition: service_healthy}
+    healthcheck: *broker-health
+    networks: [control]
+  edge-b:
+    <<: *control
+    command: [edge-agent]
+    environment:
+      <<: *env
+      MQTT_BROKER: mqtt://broker-b:1883
+      MQTT_PROTOCOL: '5'
+      EDGE_ID: B1
+      EDGE_ZONE: B
+      EDGE_CONTROL_ENABLED: '1'
+      EDGE_MODE: real-http
+      EDGE_BACKEND_URL: http://127.0.0.1:8080
+      EDGE_RECONSTRUCTOR_URL: http://reconstructor-b:9200
+      EDGE_LEDGER_PATH: /data/control/edge-ledger.json
+      STORAGE_ROOT: /data/files
+      HTTP_AUTH_TOKEN_FILE: /run/lab-secrets/edge-B1.http-token
+    depends_on:
+      broker-b: {condition: service_healthy}
+      zone-a: {condition: service_healthy}
+      zone-b: {condition: service_healthy}
+      reconstructor-b: {condition: service_healthy}
+    ports: ["${V2_BIND_IP:-127.0.0.1}:${V2_EDGE_B_PORT:-19282}:8088"]
+    volumes:
+      - ./.runtime/config.json:/config/config.json:ro
+      - ./.runtime/identities/edge-B1:/run/lab-secrets:ro
+      - edge-b-data:/data
+  reconstructor-b:
+    image: caribou/edge-v2-reader:dev
+    build: {context: ../../videostreaming, dockerfile: Dockerfile}
+    restart: unless-stopped
+    init: true
+    mem_limit: 512m
+    cpus: 1.0
+    environment:
+      WORKER_TOKEN_FILE: /run/identity/edge-B1.http-token
+      ALLOWED_EDGE_ORIGINS: http://edge-a:8088,http://edge-b:8088
+      WORKERS: '1'
+      PREFETCH: '0'
+    volumes:
+      - ./.runtime/identities/edge-B1:/run/identity:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9200/health',timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [control]
+  auth:
+    image: caribou/edge-v2-auth:dev
+    build: {context: ../.., dockerfile: deploy/integration/Dockerfile.auth}
+    restart: unless-stopped
+    volumes: ["auth-data:/data"]
+    networks: [control]
+  web:
+    image: caribou/edge-v2-web:dev
+    build: {context: ../.., dockerfile: deploy/integration/Dockerfile.web}
+    restart: unless-stopped
+    init: true
+    mem_limit: 1g
+    cpus: 2.0
+    environment:
+      CENTRAL_URL: http://central:8088
+      AUTH_URL: http://auth:8082
+      UPLOAD_SOURCE_NODE: A1
+      WEB_BLOCK_PIPELINE: '1'
+    ports: ["${V2_BIND_IP:-127.0.0.1}:${V2_WEB_PORT:-19290}:8080"]
+    volumes:
+      - ./.runtime/operator:/run/web-secrets:ro
+      - ./.runtime/config.json:/config/config.json:ro
+      - web-data:/data
+    depends_on:
+      auth: {condition: service_healthy}
+      edge-a: {condition: service_healthy}
+      edge-b: {condition: service_healthy}
+    networks: [control]
+networks:
+  control: {driver: bridge}
+volumes:
+  hub-data:
+  central-data:
+  zone-a-data:
+  zone-b-data:
+  broker-a-data:
+  broker-b-data:
+  edge-a-data:
+  edge-b-data:
+  auth-data:
+  web-data:

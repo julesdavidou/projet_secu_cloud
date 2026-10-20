@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/julesdavidou/projet_secu_cloud/internal/transportsecurity"
 	"io"
 	"net/http"
 	"net/url"
@@ -23,22 +24,29 @@ import (
 )
 
 type NodeSpec struct {
-	ID           string   `json:"id"`
-	Zone         string   `json:"zone"`
-	Quota        uint64   `json:"quota_bytes"`
-	Endpoint     string   `json:"endpoint"`
-	AllowedZones []string `json:"allowed_zones"`
-	Mode         string   `json:"mode"`
+	ID                string   `json:"id"`
+	Zone              string   `json:"zone"`
+	Quota             uint64   `json:"quota_bytes"`
+	Endpoint          string   `json:"endpoint"`
+	AllowedZones      []string `json:"allowed_zones"`
+	Mode              string   `json:"mode"`
+	BrokerName        string   `json:"broker_hostname,omitempty"`
+	ReconstructorName string   `json:"reconstructor_hostname,omitempty"`
+	ServiceRate       uint64   `json:"microcredits_per_gib_hour,omitempty"`
 }
 type Config struct {
-	Zones          []string   `json:"zones"`
-	Nodes          []NodeSpec `json:"nodes"`
-	NodeTTLSeconds int        `json:"node_ttl_seconds"`
-	LeaseSeconds   int        `json:"lease_seconds"`
-	Fanout         int        `json:"fanout"`
+	DiscoveryEnabled bool       `json:"discovery_enabled,omitempty"`
+	Zones            []string   `json:"zones"`
+	Nodes            []NodeSpec `json:"nodes"`
+	NodeTTLSeconds   int        `json:"node_ttl_seconds"`
+	LeaseSeconds     int        `json:"lease_seconds"`
+	Fanout           int        `json:"fanout"`
 }
 
 func LoadConfig(path string) (Config, error) {
+	if e := transportsecurity.ConfigureHTTP(); e != nil {
+		return Config{}, e
+	}
 	var c Config
 	raw, e := os.ReadFile(path)
 	if e != nil {
@@ -66,9 +74,15 @@ func (c Config) Validate() error {
 		if !placement.ValidID(actor) || seen[actor] || !c.HasZone(n.Zone) || n.Quota == 0 || n.Quota > 1<<50 || len(n.AllowedZones) == 0 || !Has(n.AllowedZones, n.Zone) || (n.Mode != "real-http" && n.Mode != "mock") {
 			return errors.New("invalid node identity, zone, mode or project quota")
 		}
+		if n.ReconstructorName != "" && !placement.ValidID(n.ReconstructorName) {
+			return errors.New("invalid reconstructor hostname")
+		}
+		if n.BrokerName != "" && !placement.ValidID(n.BrokerName) {
+			return errors.New("invalid broker hostname")
+		}
 		seen[actor] = true
 		u, e := url.Parse(n.Endpoint)
-		if e != nil || u.Scheme != "http" || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
 			return errors.New("node endpoint must be an explicit http origin")
 		}
 		zones := map[string]bool{}
@@ -130,7 +144,11 @@ func NewBus(ctx context.Context, id string, subs []string, h mqttbus.Handler, st
 	if e != nil {
 		return nil, e
 	}
-	return mqttbus.New(ctx, Env("MQTT_BROKER", "mqtt://broker:1883"), id, password, subs, h, state)
+	b, e := mqttbus.NewWithProtocol(ctx, Env("MQTT_BROKER", "mqtt://broker:1883"), id, password, subs, h, state, Env("MQTT_PROTOCOL", "5"))
+	if e == nil && Env("MQTT_JSON_ENVELOPE", "0") == "1" {
+		b.EnableJSONEnvelope()
+	}
+	return b, e
 }
 func Authorized(c Config, sender string) bool {
 	return sender == "central" || sender == "admin" || strings.HasPrefix(sender, "zone-") && c.HasZone(strings.TrimPrefix(sender, "zone-"))

@@ -1,0 +1,7 @@
+{
+  "fixture": "synthetic identities and generated test keys; no production credentials",
+  "legitimate_signature_valid": true,
+  "cross_owner_forgery_from_own_share_accepted": true,
+  "private_master_scalar_used_by_attacker": false,
+  "production_files_modified": false
+}

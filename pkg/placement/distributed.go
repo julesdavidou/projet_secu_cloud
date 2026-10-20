@@ -3,6 +3,7 @@ package placement
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -67,6 +68,7 @@ type DistributedPlan struct {
 	State        string            `json:"state"`
 	Assignments  []Assignment      `json:"assignments"`
 	Reservations map[string]string `json:"reservations"`
+	Service      *ServiceQuote     `json:"service,omitempty"`
 }
 
 func reservationID(request, zone string) string {
@@ -82,6 +84,22 @@ func estimate(p Path, size uint64) (float64, bool) {
 	return *p.RTTSeconds + float64(size) / *p.GoodputBytesPerSecond, true
 }
 func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now time.Time, lease time.Duration) (DistributedPlan, error) {
+	return c.distribute(ctx, m, target, now, lease, nil, false)
+}
+
+func (c *Coordinator) PlaceWithPolicy(ctx context.Context, m Manifest, target uint64, now time.Time, lease time.Duration, p *ServicePolicy) (DistributedPlan, error) {
+	return c.distribute(ctx, m, target, now, lease, p, false)
+}
+
+// OfferWithPolicy uses the same scheduler, without reserving any capacity.
+func (c *Coordinator) OfferWithPolicy(ctx context.Context, m Manifest, target uint64, now time.Time, lease time.Duration, p *ServicePolicy) (DistributedPlan, error) {
+	return c.distribute(ctx, m, target, now, lease, p, true)
+}
+
+func (c *Coordinator) distribute(ctx context.Context, m Manifest, target uint64, now time.Time, lease time.Duration, policy *ServicePolicy, dry bool) (DistributedPlan, error) {
+	if e := policy.Validate(); e != nil {
+		return DistributedPlan{}, e
+	}
 	extents, err := Extents(m, target)
 	if err != nil {
 		return DistributedPlan{}, err
@@ -104,17 +122,36 @@ func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now 
 		seen[n.ID] = true
 	}
 	out := DistributedPlan{RequestID: m.RequestID, VideoID: m.VideoID, State: "RESERVED", Reservations: map[string]string{}}
-	request := func(zone string, left []Extent) ReservationRequest {
-		return ReservationRequest{m.RequestID, m.VideoID, reservationID(m.RequestID, zone), left, now.Add(lease)}
+	expires := now.Add(lease)
+	if !dry {
+		if old, ok := c.Local.Checkpoint().Reservations[reservationID(m.RequestID, c.Local.ID)]; ok && old.Request.RequestID == m.RequestID && old.Request.VideoID == m.VideoID && (old.State == "RESERVED" || old.State == "COMMITTED") {
+			expires = old.Request.Expires
+		}
 	}
-	local, err := c.Local.Reserve(request(c.Local.ID, extents), now)
+	request := func(zone string, left []Extent) ReservationRequest {
+		return ReservationRequest{RequestID: m.RequestID, VideoID: m.VideoID, ReservationID: reservationID(m.RequestID, zone), Extents: left, Expires: expires, Policy: clonePolicy(policy)}
+	}
+	var local Reservation
+	if dry {
+		local, err = c.Local.Offer(request(c.Local.ID, extents), now)
+		out.State = "PLANNED"
+	} else {
+		local, err = c.Local.Reserve(request(c.Local.ID, extents), now)
+	}
 	if err != nil {
 		return DistributedPlan{}, err
 	}
 	out.Reservations[c.Local.ID] = local.Request.ReservationID
 	out.Assignments = append(out.Assignments, local.Plan...)
+	observed := map[string]Observation{}
+	for id, o := range local.Observations {
+		observed[id] = o
+	}
 	left := local.Remaining
 	rollback := func() {
+		if dry {
+			return
+		}
 		_ = c.Local.Release(local.Request.ReservationID)
 		for _, n := range c.Neighbors {
 			if id, ok := out.Reservations[n.ID]; ok {
@@ -184,7 +221,16 @@ func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now 
 			rq := request(n.ID, left)
 			out.Reservations[n.ID] = rq.ReservationID
 			op, cancel := context.WithTimeout(ctx, c.Timeout)
-			reserved, e := n.Peer.Reserve(op, rq)
+			var reserved Reservation
+			var e error
+			if dry {
+				reserved, e = n.Peer.Offer(op, rq)
+				if reserved.State == "PLANNED" {
+					reserved.State = "RESERVED"
+				}
+			} else {
+				reserved, e = n.Peer.Reserve(op, rq)
+			}
 			cancel()
 			if e == nil {
 				e = validateReply(n.ID, rq, reserved)
@@ -193,9 +239,14 @@ func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now 
 				// RESERVE may have committed before a response was lost. RELEASE
 				// its known identity; the lease bounds loss if the peer is offline.
 				clean, stop := context.WithTimeout(context.Background(), c.Timeout)
-				_ = n.Peer.Release(clean, rq.ReservationID)
+				if !dry {
+					_ = n.Peer.Release(clean, rq.ReservationID)
+				}
 				stop()
 				continue
+			}
+			for id, o := range reserved.Observations {
+				observed[id] = o
 			}
 			out.Assignments = append(out.Assignments, reserved.Plan...)
 			left = reserved.Remaining
@@ -209,6 +260,11 @@ func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now 
 		rollback()
 		return DistributedPlan{}, ErrCapacity
 	}
+	out.Service, err = Quote(policy, out.Assignments, observed, now)
+	if err != nil {
+		rollback()
+		return DistributedPlan{}, err
+	}
 	sort.Slice(out.Assignments, func(i, j int) bool { return out.Assignments[i].ID < out.Assignments[j].ID })
 	return out, nil
 }
@@ -216,6 +272,11 @@ func (c *Coordinator) Place(ctx context.Context, m Manifest, target uint64, now 
 // A remote response must be a complete partition of the requested extents;
 // it cannot omit work, invent capacities or assign another zone's nodes.
 func validateReply(zone string, q ReservationRequest, r Reservation) error {
+	a, _ := json.Marshal(q.Policy)
+	b, _ := json.Marshal(r.Request.Policy)
+	if string(a) != string(b) {
+		return errors.New("remote service policy changed")
+	}
 	if r.State != "RESERVED" || r.Request.RequestID != q.RequestID || r.Request.VideoID != q.VideoID || r.Request.ReservationID != q.ReservationID || !r.Request.Expires.Equal(q.Expires) {
 		return errors.New("invalid reservation response")
 	}

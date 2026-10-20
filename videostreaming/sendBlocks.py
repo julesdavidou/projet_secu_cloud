@@ -27,7 +27,6 @@ from pathlib import Path
 
 import httpx
 
-from placement import choose_nodes_for_segments
 
 try:
     import paho.mqtt.publish as mqtt_publish
@@ -50,6 +49,8 @@ def send_blocks_distributed(
     manifest_path: Path | None = None,  # ex: hls_dir/index.m3u8, pour que la passerelle puisse le servir
     mqtt_broker: str | None = None,       # ex: "192.168.1.1" (broker déjà en place)
     mqtt_port: int = 1883,
+    signer=None,                          # SegmentSigner (segment_signer.py) -> VOD signée ; None = non signé
+    include_v: bool = False,              # stocke V pour localiser un bloc altéré (volumineux)
 ) -> dict[str, str]:
     """Envoie les blocs, groupés par segment, vers un seul Edge Agent par segment.
 
@@ -61,9 +62,14 @@ def send_blocks_distributed(
         print(f"Aucun dossier de segment trouvé dans {blocks_dir}")
         return {}
 
+    try:
+        from placement import choose_nodes_for_segments
+    except ImportError as error:
+        raise RuntimeError("legacy sender requires placement.py; integrated publication must use the authoritative Go API") from error
     segment_names = [d.name for d in seg_dirs]
     placement = choose_nodes_for_segments(video_id, segment_names, node_urls, strategy=strategy)
 
+    signatures: dict[str, dict] = {}
     with httpx.Client(timeout=60) as client:
         for seg_dir in seg_dirs:
             segment_name = seg_dir.name
@@ -77,7 +83,11 @@ def send_blocks_distributed(
                     resp = client.put(url, content=f.read())
                     resp.raise_for_status()
 
-            print(f" [+] {segment_name} ({len(files)} fichiers) -> {target_node}")
+            if signer is not None:
+                payloads = [p.read_bytes() for p in sorted(seg_dir.glob("block_*.bin"))]
+                signatures[segment_name] = signer.sign_segment(video_id, segment_name, payloads, include_v=include_v)
+
+            print(f" [+] {segment_name} ({len(files)} fichiers) -> {target_node}" + (" signé" if signer else ""))
 
     manifest_text = manifest_path.read_text() if manifest_path and manifest_path.is_file() else None
 
@@ -87,6 +97,9 @@ def send_blocks_distributed(
         "placement": placement,
         "manifest": manifest_text,
     }
+    if signer is not None:
+        manifest_data["security"] = signer.security_header()
+        manifest_data["segment_signatures"] = signatures
     out_path = blocks_dir / "placement.json"
     out_path.write_text(json.dumps(manifest_data, indent=2))
     print(f" [+] placement persisté dans {out_path}")

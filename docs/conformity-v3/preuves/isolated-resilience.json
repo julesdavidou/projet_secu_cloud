@@ -1,0 +1,42 @@
+{
+  "missing": "REJECTED_AND_RESTORED",
+  "storage": [
+    {
+      "volume": "caribou-secure-v3-b1-3f330b42a6f868150a64ae31-data",
+      "owner": "client-cf967303-6e2b-46eb-bf62-b50ea8194ca2",
+      "docker_socket": false,
+      "container": "/caribou-secure-v3-b1-3f330b42a6f868150a64ae31",
+      "node": "B1",
+      "host_ports": 0
+    },
+    {
+      "volume": "caribou-secure-v3-a1-9d8903c90b734515a787b64a-data",
+      "owner": "client-cf967303-6e2b-46eb-bf62-b50ea8194ca2",
+      "docker_socket": false,
+      "container": "/caribou-secure-v3-a1-9d8903c90b734515a787b64a",
+      "node": "A1",
+      "host_ports": 0
+    },
+    {
+      "volume": "caribou-secure-v3-b1-1f8429427464005fa1aab950-data",
+      "owner": "client-6f560c70-d77d-46ed-a28e-db99343a71b3",
+      "docker_socket": false,
+      "container": "/caribou-secure-v3-b1-1f8429427464005fa1aab950",
+      "node": "B1",
+      "host_ports": 0
+    },
+    {
+      "volume": "caribou-secure-v3-a1-df4312d9dc74b4e3ef0365ef-data",
+      "owner": "client-6f560c70-d77d-46ed-a28e-db99343a71b3",
+      "docker_socket": false,
+      "container": "/caribou-secure-v3-a1-df4312d9dc74b4e3ef0365ef",
+      "node": "A1",
+      "host_ports": 0
+    }
+  ],
+  "corruption": "REJECTED_AND_RESTORED",
+  "restart": true,
+  "passed": true,
+  "peer_hub_down": true,
+  "physical_lab": "NOT_TESTED"
+}

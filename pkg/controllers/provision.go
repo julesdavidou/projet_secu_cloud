@@ -101,6 +101,13 @@ func Provision(cfg Config, out string) error {
 				targets = append(targets, "zone-"+z)
 			}
 		}
+		if strings.HasPrefix(id, "edge-") {
+			for _, peer := range cfg.Nodes {
+				if "edge-"+peer.ID != id {
+					targets = append(targets, "edge-"+peer.ID)
+				}
+			}
+		}
 		for _, target := range targets {
 			fmt.Fprintf(&acl, "topic write %s%s/request/%s\n", mqttbus.Root, target, id)
 		}

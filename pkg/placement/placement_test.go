@@ -124,7 +124,7 @@ func TestReservationsConcurrentExpirationAndSnapshots(t *testing.T) {
 	now := time.Now()
 	z := NewZone("A", time.Minute)
 	_ = z.Upsert(node("n", "A", 10, now), now)
-	rq := ReservationRequest{"req", "v", "r", []Extent{{0, 0, 0, 10}}, now.Add(time.Second)}
+	rq := ReservationRequest{"req", "v", "r", []Extent{{0, 0, 0, 10}}, now.Add(time.Second), nil}
 	offer, err := z.Offer(rq, now)
 	if err != nil || len(offer.Plan) != 1 || z.Summary(now).Available != 10 {
 		t.Fatal("offer engaged")
@@ -346,7 +346,7 @@ func TestMobilityGenerationQuarantinesSource(t *testing.T) {
 	if z.Upsert(n, now) == nil {
 		t.Fatal("old owner revived")
 	}
-	r, e := z.Offer(ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 1}}, now.Add(time.Minute)}, now)
+	r, e := z.Offer(ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 1}}, now.Add(time.Minute), nil}, now)
 	if e != nil || len(r.Plan) != 0 {
 		t.Fatal("departure admission", e, r)
 	}
@@ -359,7 +359,7 @@ func TestSnapshotAcceptedAfterCallerClock(t *testing.T) {
 	if err := z.Upsert(node("n", "A", 10, observed), observed); err != nil {
 		t.Fatal(err)
 	}
-	q := ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 1}}, captured.Add(time.Minute)}
+	q := ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 1}}, captured.Add(time.Minute), nil}
 	r, err := z.Reserve(q, captured)
 	if err != nil || len(r.Plan) != 1 {
 		t.Fatal("newer snapshot raced captured caller time", r, err)

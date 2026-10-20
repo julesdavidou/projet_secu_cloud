@@ -13,7 +13,7 @@ func TestDurableReservationsAndFailClosed(t *testing.T) {
 	var persisted []byte
 	z.SetCheckpointSink(func(c Checkpoint) error { var err error; persisted, err = json.Marshal(c); return err })
 	_ = z.Upsert(node("A1", "A", 10, now), now)
-	q := ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 7}}, now.Add(time.Minute)}
+	q := ReservationRequest{"r", "v", "r", []Extent{{0, 0, 0, 7}}, now.Add(time.Minute), nil}
 	first, err := z.Reserve(q, now)
 	if err != nil || len(persisted) == 0 {
 		t.Fatal(err)

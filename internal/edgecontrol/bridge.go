@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -37,20 +38,27 @@ type ledger struct {
 	Version    uint64                `json:"version"`
 	Units      map[string]storedUnit `json:"units"`
 }
+type networkIdentity struct {
+	NodeID     string `json:"node_id"`
+	ZoneID     string `json:"zone_id"`
+	Generation uint64 `json:"generation"`
+}
+
 type Bridge struct {
-	mu      sync.Mutex
-	cfg     controllers.Config
-	spec    controllers.NodeSpec
-	path    string
-	state   ledger
-	b       *mqttbus.Bus
-	status  placement.State
-	pause   bool
-	failed  bool
-	mode    string
-	token   string
-	backend string
-	client  *http.Client
+	discovery atomic.Value
+	mu        sync.Mutex
+	cfg       controllers.Config
+	spec      controllers.NodeSpec
+	path      string
+	state     ledger
+	b         *mqttbus.Bus
+	status    placement.State
+	pause     bool
+	failed    bool
+	mode      string
+	token     string
+	backend   string
+	client    *http.Client
 }
 
 func key(video string, id uint64) string { return video + "/" + strconv.FormatUint(id, 10) }
@@ -83,6 +91,8 @@ func (b *Bridge) save() error {
 	e := controllers.AtomicJSON(b.path, b.state)
 	if e != nil {
 		b.failed = true
+	} else {
+		b.discovery.Store(networkIdentity{NodeID: b.spec.ID, ZoneID: b.state.Zone, Generation: b.state.Generation})
 	}
 	return e
 }
@@ -167,6 +177,17 @@ func (b *Bridge) notify(ctx context.Context, k string) error {
 	return b.save()
 }
 func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (any, error) {
+	// Peer liveness reads only immutable provisioned identities. It must not wait
+	// for ledger operations or registration RPCs when Central is unreachable.
+	if r.Op == "PEER_PING" {
+		if !strings.HasPrefix(sender, "edge-") {
+			return nil, errors.New("peer identity required")
+		}
+		if _, ok := b.cfg.Node(strings.TrimPrefix(sender, "edge-")); !ok {
+			return nil, errors.New("unknown peer")
+		}
+		return map[string]string{"node_id": b.spec.ID, "peer": sender, "transport": "direct MQTT"}, nil
+	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.failed {
@@ -203,7 +224,7 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 		for _, unit := range accepted.Units {
 			k := key(q.VideoID, unit.ID)
 			if old, ok := b.state.Units[k]; ok {
-				if old.Unit.Size != unit.Size || old.Unit.SHA256 != unit.SHA256 || old.Unit.ReservationID != q.ReservationID {
+				if old.Unit.OwnerID != unit.OwnerID || old.Unit.Size != unit.Size || old.Unit.SHA256 != unit.SHA256 || old.Unit.ReservationID != q.ReservationID {
 					return nil, errors.New("unit identity conflict")
 				}
 				if old.State == "EXPIRED" || old.State == "RELEASED" {
@@ -333,6 +354,8 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			return nil, errors.New("no stored completion to replay")
 		}
 		return map[string]int{"replayed": count}, nil
+	case "DELETE_OBJECT":
+		return nil, errors.New("managed deletion is not implemented; catalogue and quota must be coordinated")
 	case "MOCK_STORE":
 		if b.mode != "mock" || sender != "central" {
 			return nil, errors.New("MOCK_STORE forbidden in real-http")
@@ -357,7 +380,7 @@ func (b *Bridge) Handle(ctx context.Context, sender string, r mqttbus.Request) (
 			}
 		}
 		return map[string]string{"proof": "MOCK"}, b.announce(ctx, true)
-	case "STATUS":
+	case "STATUS", "REQUEST_STATUS", "REFRESH_STATE":
 		if sender != "central" && !controllers.Authorized(b.cfg, sender) {
 			return nil, errors.New("status unauthorized")
 		}
@@ -384,7 +407,7 @@ func (b *Bridge) backendRequest(ctx context.Context, method, path string, body i
 	return b.client.Do(r)
 }
 func (b *Bridge) verifyBackend(ctx context.Context, u storedUnit) error {
-	r, e := b.backendRequest(ctx, "GET", "/v1/storage/project/"+u.Unit.Object, nil, 0, "")
+	r, e := b.unitRequest(ctx, u.Unit, "GET", false, nil, 0, "")
 	if e != nil {
 		return e
 	}
@@ -429,7 +452,7 @@ func (b *Bridge) write(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unit lease/length invalid", 422)
 		return
 	}
-	response, e := b.backendRequest(r.Context(), "PUT", "/v1/verified/project/"+u.Unit.Object, r.Body, r.ContentLength, u.Unit.SHA256)
+	response, e := b.unitRequest(r.Context(), u.Unit, "PUT", true, r.Body, r.ContentLength, u.Unit.SHA256)
 	if e != nil {
 		http.Error(w, e.Error(), 502)
 		return
@@ -472,7 +495,7 @@ func (b *Bridge) read(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	response, e := b.backendRequest(r.Context(), "GET", "/v1/storage/project/"+u.Unit.Object, nil, 0, "")
+	response, e := b.unitRequest(r.Context(), u.Unit, "GET", false, nil, 0, "")
 	if e != nil {
 		http.Error(w, e.Error(), 502)
 		return
@@ -503,6 +526,9 @@ func Run(ctx context.Context, cfg controllers.Config) error {
 	}
 	b.b = bus
 	close(started)
+	if cfg.DiscoveryEnabled {
+		go controllers.SyncDiscovery(ctx, bus)
+	}
 	var ready atomic.Bool
 	go func() {
 		lastError := ""
@@ -541,9 +567,28 @@ func Run(ctx context.Context, cfg controllers.Config) error {
 	}()
 	mux := http.NewServeMux()
 	controllers.Health(mux, ready.Load)
+	mux.HandleFunc("GET /service/probe", func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("X-Verified-Identity"), "zone-") {
+			http.Error(w, "zone certificate required", 403)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(make([]byte, 64<<10))
+	})
+	mux.HandleFunc("GET /discovery", func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("X-Verified-Identity"), "zone-") {
+			http.Error(w, "zone certificate required", 403)
+			return
+		}
+		// Network identity is a committed immutable snapshot. It must not wait
+		// for the ledger lock held by a central reconnect attempt.
+		controllers.JSON(w, 200, b.discovery.Load())
+	})
 	storage := http.NewServeMux()
 	storage.HandleFunc("PUT /store/{video}/{extent}", b.write)
-	storage.HandleFunc("GET /store/{video}/{extent}", b.read)
+	mux.HandleFunc("GET /store/{video}/{extent}", b.readAuthorized)
+	mux.Handle("POST /reconstruct", controllers.Bearer(b.token, http.HandlerFunc(b.reconstruct)))
 	mux.Handle("/store/", controllers.Bearer(b.token, storage))
 	return controllers.Serve(ctx, controllers.Env("HTTP_ADDR", ":8088"), mux)
 }

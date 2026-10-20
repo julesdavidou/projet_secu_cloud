@@ -198,7 +198,9 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			saved := z.Checkpoint().Reservations[q.ID]
 			for _, a := range saved.Plan {
-				_ = RPC(opctx, b, "edge-"+a.NodeID, "RELEASE", q, nil)
+				if e := RPC(opctx, b, "edge-"+a.NodeID, "RELEASE", q, nil); e != nil {
+					return nil, e
+				}
 			}
 			e := z.Release(q.ID)
 			mark()
@@ -246,7 +248,7 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			registrationMu.Unlock()
 			return map[string]any{"summary": z.Summary(time.Now()), "neighbors": peers, "nodes": nodes, "offers": offers.Load(), "summary_publications": publications.Load()}, nil
-		case "UPLOAD":
+		case "QUOTE", "UPLOAD":
 			if sender != "central" && sender != "admin" {
 				return nil, errors.New("upload unauthorized")
 			}
@@ -256,6 +258,13 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			if e := q.Validate(); e != nil {
 				return nil, e
+			}
+			selected := coordinator
+			if q.Policy != nil {
+				selected = measuredCoordinator(opctx, coordinator)
+			}
+			if r.Op == "QUOTE" {
+				return selected.OfferWithPolicy(opctx, q.Manifest, q.Target, time.Now(), time.Duration(cfg.LeaseSeconds)*time.Second, q.Policy)
 			}
 			uploadMu.Lock()
 			defer uploadMu.Unlock()
@@ -272,6 +281,20 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 				if previous.State == "FAILED" {
 					return nil, errors.New("request failed/expired; use a new request_id")
 				}
+				if previous.State != "READY" {
+					for zone, id := range previous.Plan.Reservations {
+						q := Prepare{VideoID: previous.Upload.Manifest.VideoID, ReservationID: id}
+						var e error
+						if zone == z.ID {
+							e = prepareLocal(opctx, q)
+						} else {
+							e = RPC(opctx, b, "zone-"+zone, "PREPARE", q, nil)
+						}
+						if e != nil {
+							return nil, e
+						}
+					}
+				}
 				return previous, nil
 			}
 			registrationMu.Lock()
@@ -282,13 +305,13 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			now := time.Now()
 			lease := time.Duration(cfg.LeaseSeconds) * time.Second
-			plan, e := coordinator.Place(opctx, q.Manifest, q.Target, now, lease)
+			plan, e := selected.PlaceWithPolicy(opctx, q.Manifest, q.Target, now, lease, q.Policy)
 			mark()
 			if e != nil {
 				return nil, e
 			}
 			var record UploadRecord
-			if e = RPC(opctx, b, "central", "PLAN", PlanCommit{q, plan, now.Add(lease)}, &record); e != nil {
+			if e = RPC(opctx, b, "central", "PLAN", PlanCommit{q, plan, z.Checkpoint().Reservations[plan.Reservations[z.ID]].Request.Expires}, &record); e != nil {
 				return nil, e
 			}
 			for zone, id := range plan.Reservations {
@@ -329,6 +352,20 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 		}
 	}
 	close(started)
+	if cfg.DiscoveryEnabled {
+		go SyncDiscovery(ctx, b)
+	}
+	if Env("TLS_CA_FILE", "") != "" {
+		go probeZone(ctx, cfg, z, func() []Registered {
+			registrationMu.Lock()
+			defer registrationMu.Unlock()
+			out := []Registered{}
+			for _, n := range registered {
+				out = append(out, n)
+			}
+			return out
+		})
+	}
 	var ready atomic.Bool
 	ready.Store(true)
 	go mqttbus.Coalesce(ctx, 250*time.Millisecond, dirty, critical, func() {
@@ -353,5 +390,19 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 	}()
 	mux := http.NewServeMux()
 	Health(mux, ready.Load)
+	mux.HandleFunc("GET /service/probe", func(w http.ResponseWriter, r *http.Request) {
+		peer := r.Header.Get("X-Verified-Identity")
+		if !strings.HasPrefix(peer, "zone-") || !cfg.HasZone(strings.TrimPrefix(peer, "zone-")) {
+			http.Error(w, "zone certificate required", 403)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(make([]byte, 64<<10))
+	})
+	if cfg.DiscoveryEnabled {
+		if e := ZoneDiscovery(mux, cfg, z.ID, b); e != nil {
+			return e
+		}
+	}
 	return Serve(ctx, Env("CONTROLLER_HTTP_ADDR", ":8088"), mux)
 }

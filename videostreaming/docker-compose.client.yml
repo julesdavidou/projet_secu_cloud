@@ -1,0 +1,11 @@
+services:
+  edge-client-agent:
+    build: .
+    ports: ["127.0.0.1:9200:9200"]   # accessible seulement depuis la machine du lecteur
+    environment:
+      PLACEMENT_URL: "http://CONTROL_PLANE_OU_PASSERELLE/placement/vid1.json"   # ou PLACEMENT_FILE + volume
+      PINNED_PK_S: /pinned/pinned.json
+      WORKERS: "4"
+      PREFETCH: "2"
+    volumes:
+      - ./pinned.json:/pinned/pinned.json:ro

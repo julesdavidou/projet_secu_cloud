@@ -12,12 +12,26 @@ type Content struct {
 	SHA256   string `json:"sha256"`
 }
 type Upload struct {
-	Manifest placement.Manifest `json:"manifest"`
-	Target   uint64             `json:"target_size_bytes"`
-	Contents []Content          `json:"contents"`
+	RootID         string                   `json:"root_id,omitempty"`
+	OperationKind  string                   `json:"operation_kind,omitempty"`
+	Policy         *placement.ServicePolicy `json:"service_policy,omitempty"`
+	OwnerID        string                   `json:"owner_id,omitempty"`
+	ManifestSHA256 string                   `json:"manifest_sha256,omitempty"`
+	Manifest       placement.Manifest       `json:"manifest"`
+	Target         uint64                   `json:"target_size_bytes"`
+	Contents       []Content                `json:"contents"`
 }
 
 func (u Upload) Validate() error {
+	if u.RootID != "" && (!placement.ValidID(u.RootID) || u.RootID == u.Manifest.VideoID || u.OwnerID == "") {
+		return errors.New("invalid version root")
+	}
+	if e := u.Policy.Validate(); e != nil {
+		return e
+	}
+	if (u.OwnerID != "" || u.ManifestSHA256 != "") && (!placement.ValidID(u.OwnerID) || !ValidHash(u.ManifestSHA256)) {
+		return errors.New("invalid signed owner or manifest digest")
+	}
 	ext, e := placement.Extents(u.Manifest, u.Target)
 	if e != nil {
 		return e
@@ -38,6 +52,7 @@ type Registered struct {
 	Endpoint string         `json:"endpoint"`
 }
 type Unit struct {
+	OwnerID string `json:"owner_id,omitempty"`
 	placement.Assignment
 	SHA256   string `json:"sha256"`
 	Object   string `json:"object"`

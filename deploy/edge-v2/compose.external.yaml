@@ -1,0 +1,12 @@
+# PC controllers only. Provide explicit LAN topology, Hub and BindIP.
+services:
+  edge-a: {profiles: [pc-local]}
+  edge-b: {profiles: [pc-local]}
+  broker-a: {profiles: [pc-local]}
+  broker-b: {profiles: [pc-local]}
+  reconstructor-a: {profiles: [pc-local]}
+  reconstructor-b: {profiles: [pc-local]}
+  web:
+    depends_on: !override
+      central: {condition: service_healthy}
+      auth: {condition: service_healthy}

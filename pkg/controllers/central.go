@@ -19,9 +19,10 @@ import (
 )
 
 type centralState struct {
-	Nodes   map[string]Registered    `json:"nodes"`
-	Uploads map[string]UploadRecord  `json:"uploads"`
-	Outbox  map[string]catalog.Event `json:"outbox"`
+	Discoveries map[string]Discovery     `json:"discoveries,omitempty"`
+	Nodes       map[string]Registered    `json:"nodes"`
+	Uploads     map[string]UploadRecord  `json:"uploads"`
+	Outbox      map[string]catalog.Event `json:"outbox"`
 }
 type Central struct {
 	mu     sync.Mutex
@@ -146,6 +147,30 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 			return nil, nil
 		}
 		return c.record(key.RequestID, u)
+	case "DISCOVERY_GET":
+		if !Authorized(c.cfg, sender) && !strings.HasPrefix(sender, "edge-") {
+			return nil, errors.New("directory unauthorized")
+		}
+		return discoveryRoutes(c.cfg, c.state.Discoveries, time.Now()), nil
+	case "DISCOVERY_SET":
+		var d Discovery
+		if e := mqttbus.Decode(r.Body, &d); e != nil {
+			return nil, e
+		}
+		if !c.cfg.DiscoveryEnabled || sender != "zone-"+d.ZoneID || validateDiscovery(c.cfg, d, time.Now()) != nil {
+			return nil, errors.New("discovery authority mismatch")
+		}
+		if n, ok := c.state.Nodes[d.NodeID]; ok && (n.Node.Zone != d.ZoneID || n.Node.Generation != d.Generation) {
+			return nil, errors.New("discovery differs from registered mobility generation")
+		}
+		if old, ok := c.state.Discoveries[d.NodeID]; ok && (old.Generation > d.Generation || old.Observed.After(d.Observed)) {
+			return nil, errors.New("stale discovery")
+		}
+		if c.state.Discoveries == nil {
+			c.state.Discoveries = map[string]Discovery{}
+		}
+		c.state.Discoveries[d.NodeID] = d
+		return map[string]bool{"admitted": true}, c.save()
 	case "PLAN":
 		var p PlanCommit
 		if e := mqttbus.Decode(r.Body, &p); e != nil {
@@ -169,6 +194,9 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 		if _, _, exists := c.findVideo(p.Upload.Manifest.VideoID); exists {
 			return nil, errors.New("video identity already belongs to another request")
 		}
+		if e := validateService(c.cfg, p.Upload, p.Plan, time.Now()); e != nil {
+			return nil, e
+		}
 		u := UploadRecord{Upload: p.Upload, Plan: p.Plan, Expires: p.Expires, State: "RESERVED"}
 		ext, e := placement.Extents(p.Upload.Manifest, p.Upload.Target)
 		if e != nil {
@@ -185,7 +213,10 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 			if !ok {
 				return nil, errors.New("unknown target node")
 			}
-			u.Units = append(u.Units, Unit{Assignment: a, SHA256: p.Upload.Contents[i].SHA256, Object: EventID("object", p.Upload.Manifest.VideoID, a.ID) + ".bin", Endpoint: n.Endpoint, State: "RESERVED"})
+			if p.Upload.Policy != nil && p.Plan.Service.Observations[a.NodeID].Generation != n.Node.Generation {
+				return nil, errors.New("node moved after service observation")
+			}
+			u.Units = append(u.Units, Unit{OwnerID: p.Upload.OwnerID, Assignment: a, SHA256: p.Upload.Contents[i].SHA256, Object: EventID("object", p.Upload.Manifest.VideoID, a.ID) + ".bin", Endpoint: n.Endpoint, State: "RESERVED"})
 		}
 		c.state.Uploads[p.Upload.Manifest.RequestID] = u
 		event := catalog.Event{ID: EventID("plan", p.Upload.Manifest.RequestID), Op: "PLAN", Manifest: p.Upload.Manifest, Plan: p.Plan, Expires: p.Expires}
@@ -389,6 +420,7 @@ func RunCentral(ctx context.Context, cfg Config) error {
 	ready.Store(true)
 	go func() {
 		committed := map[string]bool{}
+		released := map[string]bool{}
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
 		for {
@@ -400,8 +432,16 @@ func RunCentral(ctx context.Context, cfg Config) error {
 				ready.Store(e == nil)
 				c.mu.Lock()
 				pending := map[string]string{}
+				cancelled := map[string]string{}
 				for id, u := range c.state.Uploads {
 					record, err := c.record(id, u)
+					if err == nil && record.State == "FAILED" {
+						for zone, res := range u.Plan.Reservations {
+							if !released[res] {
+								cancelled[res] = zone
+							}
+						}
+					}
 					if err == nil && record.State == "READY" {
 						for zone, res := range u.Plan.Reservations {
 							if !committed[res] {
@@ -411,6 +451,13 @@ func RunCentral(ctx context.Context, cfg Config) error {
 					}
 				}
 				c.mu.Unlock()
+				// Retry after broker outages and process restarts. RELEASE only
+				// releases reservations; stored bytes and their quota stay intact.
+				for res, zone := range cancelled {
+					if RPC(ctx, b, "zone-"+zone, "RELEASE", Key{res}, nil) == nil {
+						released[res] = true
+					}
+				}
 				for res, zone := range pending {
 					if RPC(ctx, b, "zone-"+zone, "COMMIT", Key{res}, nil) == nil {
 						committed[res] = true
@@ -453,6 +500,36 @@ func RunCentral(ctx context.Context, cfg Config) error {
 			return
 		}
 		JSON(w, 200, u)
+	})
+	api.HandleFunc("GET /api/v1/discovery/routes", func(w http.ResponseWriter, r *http.Request) {
+		c.mu.Lock()
+		routes := discoveryRoutes(cfg, c.state.Discoveries, time.Now())
+		c.mu.Unlock()
+		JSON(w, 200, routes)
+	})
+	api.HandleFunc("POST /api/v1/quotes", func(w http.ResponseWriter, r *http.Request) {
+		var q Upload
+		if e := ReadBody(w, r, &q); e != nil {
+			http.Error(w, "invalid quote", 400)
+			return
+		}
+		if e := q.Validate(); e != nil {
+			http.Error(w, e.Error(), 400)
+			return
+		}
+		c.mu.Lock()
+		n, ok := c.state.Nodes[q.Manifest.SourceNodeID]
+		c.mu.Unlock()
+		if !ok {
+			http.Error(w, "source not registered", 409)
+			return
+		}
+		var v placement.DistributedPlan
+		if e := RPC(r.Context(), b, "zone-"+n.Node.Zone, "QUOTE", q, &v); e != nil {
+			http.Error(w, e.Error(), 409)
+			return
+		}
+		JSON(w, 200, v)
 	})
 	api.HandleFunc("POST /api/v1/uploads", func(w http.ResponseWriter, r *http.Request) {
 		var q Upload
@@ -500,6 +577,7 @@ func RunCentral(ctx context.Context, cfg Config) error {
 		}
 		JSON(w, 200, out)
 	})
+	c.operationAPI(api)
 	mux.Handle("/api/", Bearer(token, api))
 	return Serve(ctx, Env("HTTP_ADDR", ":8088"), mux)
 }
