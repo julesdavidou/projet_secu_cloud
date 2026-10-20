@@ -366,6 +366,8 @@ def compose_binary(arch,runtime):
 def archive_config_digest(archive,tag,commit,arch):
     # Docker Desktop/containerd .Id may be an OCI index. Legacy Engines use
     # sha256(config JSON). Docker save's manifest.json identifies that config.
+    # Only explicitly local private bundles use commit=None (e.g. the official
+    # broker). Existing Fleet callers still require their full source revision.
     with tarfile.open(archive) as tar:
         rows = json.load(tar.extractfile('manifest.json'))
         matches = [row for row in rows if tag in (row.get('RepoTags') or [])]
@@ -373,9 +375,9 @@ def archive_config_digest(archive,tag,commit,arch):
         data = tar.extractfile(matches[0]['Config']).read()
     info = json.loads(data)
     labels = info.get('config',{}).get('Labels') or {}
-    if info.get('os')!='linux' or info.get('architecture')!=arch.split('/')[0] or labels.get('org.caribou.source-revision')!=commit:
+    if info.get('os')!='linux' or info.get('architecture')!=arch.split('/')[0] or (commit is not None and labels.get('org.caribou.source-revision')!=commit):
         raise FleetError('Plateforme/révision de la configuration exportée incorrecte.')
-    if labels.get('org.opencontainers.image.revision',commit)!=commit:
+    if commit is not None and labels.get('org.opencontainers.image.revision',commit)!=commit:
         raise FleetError('Révision OCI de la configuration exportée incorrecte.')
     if arch=='arm/v7' and info.get('variant')!='v7': raise FleetError('Archive ARM sans variante v7 confirmée.')
     return 'sha256:'+hashlib.sha256(data).hexdigest()

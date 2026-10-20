@@ -106,6 +106,17 @@ class RegistryTests(unittest.TestCase):
             self.assertEqual(fleet.archive_config_digest(archive,'test:image',self.commit,'arm/v7'),digest_bytes(data))
             with self.assertRaises(fleet.FleetError): fleet.archive_config_digest(archive,'test:image','b'*40,'arm/v7')
 
+    def test_explicit_local_archive_mode_accepts_unlabelled_broker_but_checks_platform(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive=Path(directory)/'image.tar';config=copy.deepcopy(self.config);config['config']['Labels']={}
+            data=json.dumps(config).encode()
+            with tarfile.open(archive,'w') as tar:
+                for name,raw in [('manifest.json',json.dumps([{'RepoTags':['test:image'],'Config':'config.json'}]).encode()),('config.json',data)]:
+                    entry=tarfile.TarInfo(name);entry.size=len(raw);tar.addfile(entry,io.BytesIO(raw))
+            self.assertEqual(fleet.archive_config_digest(archive,'test:image',None,'arm/v7'),digest_bytes(data))
+            with self.assertRaises(fleet.FleetError):fleet.archive_config_digest(archive,'test:image',None,'amd64')
+            with self.assertRaises(fleet.FleetError):fleet.archive_config_digest(archive,'test:image',self.commit,'arm/v7')
+
     def test_loaded_image_accepts_legacy_config_or_containerd_manifest_and_checks_revision(self):
         plan=self.plan()
         info={'Id':plan['config_digest'],'Os':'linux','Architecture':'arm',

@@ -96,6 +96,21 @@ class SecureClientTests(unittest.TestCase):
   self.assertEqual(sc.read(out/'.runtime/installation.json')['quota_bytes'],0)
   self.assertFalse(any(call[0]=='pwsh' or 'reconstructor' in call for call in calls))
 
+ def test_legacy_engine_uses_verified_config_digest_as_immutable_reference(self):
+  for plan in self.images.values():plan['config_digest']='sha256:legacy-config'
+  out=self.bundle();calls=[]
+  def docker(args,**kw):
+   calls.append(args)
+   if args[1:3]==['compose','version']:return '2.40.0'
+   if args[1]=='info':return 'linux/amd64'
+   if args[1:3]==['image','inspect']:return json.dumps([{'Id':'sha256:legacy-config'}])
+   if args[1]=='ps':return ''
+   if args[1]=='compose':return ''
+   self.fail(str(args))
+  with patch.object(sc,'command',side_effect=docker):sc.install(out)
+  self.assertEqual(sc.read(out/'compose.json')['services']['portal']['image'],'sha256:legacy-config')
+  with patch.object(sc,'command',side_effect=lambda args,**kw:json.dumps([{'Id':'sha256:untrusted'}]) if args[1:3]==['image','inspect'] else docker(args,**kw)),self.assertRaisesRegex(ValueError,'does not match'):sc.install(out)
+
  def test_installed_quota_cannot_be_silently_changed(self):
   out=self.bundle('storage',node='PI1',owners=[self.owner])
   sc.write(out/'.runtime/installation.json',{'roles':['storage'],'quota_bytes':2**28,'client_id':'test'})

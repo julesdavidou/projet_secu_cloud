@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][ValidatePattern('^[a-z][a-z0-9-]{2,31}$')][string]$ClientID,[Parameter(Mandatory)][string]$ControllerAddress,[string]$Roles='viewer',[string]$NodeID,[string[]]$Owners=@(),[Parameter(Mandatory)][string]$OutputDirectory,[string]$ControlImage='caribou/secure-v3-control:dev',[string]$SecurityImage='caribou/secure-v3-security:dev',[string]$RuntimeDirectory="$PSScriptRoot/../secure-v3/.runtime",[switch]$IncludeImages,[int]$PortOffset=0,[int]$ClientPortOffset=0,[string]$AccountFile="")
+param([Parameter(Mandatory)][ValidatePattern('^[a-z][a-z0-9-]{2,31}$')][string]$ClientID,[Parameter(Mandatory)][string]$ControllerAddress,[string]$Roles='viewer',[string]$NodeID,[string[]]$Owners=@(),[Parameter(Mandatory)][string]$OutputDirectory,[string]$ControlImage='caribou/secure-v3-control:dev',[string]$SecurityImage='caribou/secure-v3-security:dev',[string]$RuntimeDirectory="$PSScriptRoot/../secure-v3/.runtime",[switch]$IncludeImages,[int]$PortOffset=0,[int]$ClientPortOffset=0,[string]$AccountFile="",[string]$ImagesArchive="")
 $ErrorActionPreference='Stop'
 $runtime=[IO.Path]::GetFullPath($RuntimeDirectory)
 if(Test-Path -LiteralPath $OutputDirectory){throw 'Dossier existant : aucun bundle ni secret ne sera remplacé'}
@@ -19,6 +19,7 @@ $argsBundle=@('bundle','--runtime',$runtime,'--output',([IO.Path]::GetFullPath($
 if($NodeID){$argsBundle+=@('--node',$NodeID)}
 if($Owners.Count){$argsBundle+=@('--owners',($Owners -join ','))}
 if($IncludeImages){$argsBundle+='--save-images'}
+if($ImagesArchive){$argsBundle+=@('--images-archive',([IO.Path]::GetFullPath($ImagesArchive)))}
 & $python @prefix "$PSScriptRoot/secure_client.py" @argsBundle
 if($LASTEXITCODE -ne 0){throw 'Export refusé'}
 

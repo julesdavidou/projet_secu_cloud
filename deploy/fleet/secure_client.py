@@ -14,6 +14,14 @@ def command(args,**kw):
  if p.returncode:raise ValueError('Command failed: '+str(args[0])+' '+str(args[1])+'; '+(p.stderr or p.stdout)[-1200:])
  return p.stdout.strip()
 def image_info(ref):return json.loads(command(['docker','image','inspect',ref]))[0]
+def local_plan(role,reference):
+ info=image_info(reference)
+ if info.get('Os')!='linux' or info.get('Architecture')!='amd64':raise ValueError('Windows bundle images require Linux AMD64')
+ # Save named references so legacy Engines restore tags as well as configs.
+ # This namespace is content-addressed and never replaces application tags.
+ tag='caribou/bundle-'+role+':'+info['Id'].split(':')[1][:32]
+ command(['docker','image','tag',reference,tag])
+ return {'reference':tag,'image_id':info['Id'],'platform':'linux/amd64'}
 def private_ip(value):
  ip=ipaddress.ip_address(value)
  if ip.version!=4 or not ip.is_private or ip.is_loopback or ip.is_link_local:raise ValueError('controller private LAN IPv4 required')
@@ -33,7 +41,7 @@ def quota_bytes(gib,maximum):
  result=int(amount*2**30)
  if result<1024*1024:raise ValueError('minimum quota is 1 MiB')
  return result
-def make_bundle(runtime,out,client,selected,controller,images,owners,node=None,offset=0,save_images=False,client_offset=0):
+def make_bundle(runtime,out,client,selected,controller,images,owners,node=None,offset=0,save_images=False,client_offset=0,images_archive=None):
  runtime=Path(runtime).resolve();out=Path(out).resolve();controller=private_ip(controller);actors=client_actors(client,selected);cfg=read(runtime/'config.json')
  if not 0<=client_offset<=30000:raise ValueError('client port offset outside 0..30000')
  view_port,owner_port,rtmp_port=18790+client_offset,18791+client_offset,22935+client_offset
@@ -89,6 +97,11 @@ def make_bundle(runtime,out,client,selected,controller,images,owners,node=None,o
  profile={'schema':1,'client_id':client,'roles':selected,'controller_ip':controller,'port_offset':offset,'node_id':node,'max_quota_bytes':spec['quota_bytes'] if spec else 0,'owners':owners,'images':images,'ca_sha256_der':ca_digest,'storage_limit':'logical project quota including reserved/stored blocks, not a filesystem disk reservation','viewer_url':f'http://localhost:{view_port}/','owner_url':f'http://localhost:{owner_port}/','rtmp_url':f'rtmp://127.0.0.1:{rtmp_port}/live','storage_ports':{'http':8443+client_offset,'broker':8883+client_offset,'worker':9443+client_offset}}
  for source,dest in [('windows.ps1','start.ps1'),('client-publish.ps1','publish.ps1'),('secure_client.py','secure_client.py'),('registry.py','registry.py'),('fleet.py','fleet.py')]:shutil.copy2(HERE/source,out/dest)
  if save_images:command(['docker','image','save','-o',str(out/'images.tar'),*[x['reference'] for x in images.values()]],timeout=1200)
+ if images_archive:shutil.copy2(images_archive,out/'images.tar')
+ if (out/'images.tar').exists():
+  from fleet import archive_config_digest
+  for plan in images.values():
+   if 'image_id' in plan:plan['config_digest']=archive_config_digest(out/'images.tar',plan['reference'],None,'amd64')
  write(out/'profile.json',profile)
  return {'bundle':str(out),'client':client,'roles':selected,'root_private_key_exported':False}
 
@@ -109,8 +122,8 @@ def install(folder,quota=None,registry_user=None):
   if old.exists() and read(old)!=state:raise ValueError('existing installation differs; explicit migration required, no data deletion')
   plans=profile['images']
   if (folder/'images.tar').exists():command(['docker','image','load','-i',str(folder/'images.tar')],timeout=1200)
-  registry=None
-  for plan in plans.values():
+  registry=None;resolved={}
+  for role,plan in plans.items():
    if plan['reference'].startswith('ghcr.io/'):
     from registry import Registry
     if registry is None:registry=Registry(registry_user or os.environ.get('CARIBOU_GHCR_USERNAME',''),os.environ.get('CARIBOU_GHCR_TOKEN') or getpass.getpass('GHCR read:packages token (not saved): '))
@@ -121,9 +134,13 @@ def install(folder,quota=None,registry_user=None):
     if info.get('Os')!='linux' or info.get('Architecture')!='amd64':raise ValueError('public broker image platform mismatch')
    else:
     info=image_info(plan['reference'])
-    if info['Id']!=plan['image_id']:raise ValueError('local image does not match the admitted bundle; load its images archive')
+    if info['Id'] not in {plan['image_id'],plan.get('config_digest')}:raise ValueError('local image does not match the admitted bundle; load its images archive')
+    resolved[plan['reference']]=info['Id']
+    resolved[plan['image_id']]=info['Id']
+    if plan.get('config_digest'):resolved[plan['config_digest']]=info['Id']
   compose=read(folder/'compose.json');project='caribou-client-'+profile['client_id']
   if compose['name']!=project:raise ValueError('bundle project mismatch')
+  for service in compose['services'].values():service['image']=resolved.get(service['image'],service['image'])
   if 'storage' not in selected:
    for name in ['edge','broker','reconstructor']:compose['services'].pop(name,None)
   for cid in command(['docker','ps','-aq','--filter','label=com.docker.compose.project='+project]).split():
@@ -145,7 +162,7 @@ def install(folder,quota=None,registry_user=None):
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
- b=sub.add_parser('bundle');b.add_argument('--runtime',type=Path,default=ROOT/'deploy/secure-v3/.runtime');b.add_argument('--output',type=Path,required=True);b.add_argument('--client',required=True);b.add_argument('--roles',default='viewer');b.add_argument('--controller-ip',required=True);b.add_argument('--node');b.add_argument('--owners',default='');b.add_argument('--control-image',default='caribou/secure-v3-control:dev');b.add_argument('--security-image',default='caribou/secure-v3-security:dev');b.add_argument('--save-images',action='store_true');b.add_argument('--port-offset',type=int,default=0);b.add_argument('--client-port-offset',type=int,default=0);b.add_argument('--image-commit');b.add_argument('--repository',default='julesdavidou/projet_secu_cloud');b.add_argument('--registry-user')
+ b=sub.add_parser('bundle');b.add_argument('--runtime',type=Path,default=ROOT/'deploy/secure-v3/.runtime');b.add_argument('--output',type=Path,required=True);b.add_argument('--client',required=True);b.add_argument('--roles',default='viewer');b.add_argument('--controller-ip',required=True);b.add_argument('--node');b.add_argument('--owners',default='');b.add_argument('--control-image',default='caribou/secure-v3-control:dev');b.add_argument('--security-image',default='caribou/secure-v3-security:dev');b.add_argument('--save-images',action='store_true');b.add_argument('--port-offset',type=int,default=0);b.add_argument('--client-port-offset',type=int,default=0);b.add_argument('--image-commit');b.add_argument('--repository',default='julesdavidou/projet_secu_cloud');b.add_argument('--registry-user');b.add_argument('--images-archive',type=Path)
  i=sub.add_parser('install');i.add_argument('--bundle',type=Path,required=True);i.add_argument('--quota-gib');i.add_argument('--registry-user')
  a=p.parse_args()
  if a.action=='bundle':
@@ -157,16 +174,16 @@ def main():
    images={k:registry.resolve(a.repository,'control' if k=='control' else 'secure-security',a.image_commit,'linux/amd64',require_client_portal=k=='control') for k in components}
    if a.save_images:raise ValueError('save-images requires local image mode; registry bundles pull immutable digests')
   else:
-   images={k:{'reference':image_info(v)['Id'],'image_id':image_info(v)['Id'],'platform':'linux/amd64'} for k,v in components.items()}
+   images={k:local_plan(k,v) for k,v in components.items()}
    if image_info(a.control_image).get('Config',{}).get('Labels',{}).get('io.caribou.client-portal')!='1':raise ValueError('control image lacks the secure client portal capability; build this branch first')
   if 'storage' in selected:
    broker=image_info('eclipse-mosquitto:2.0.22')
-   images['broker']={'reference':broker['Id'],'image_id':broker['Id'],'platform':'linux/amd64'}
+   images['broker']=local_plan('broker','eclipse-mosquitto:2.0.22')
    if a.image_commit:
     digest=next((r for r in broker.get('RepoDigests',[]) if r.startswith('eclipse-mosquitto@sha256:') or r.startswith('eclipse-mosquitto:') or r.startswith('docker.io/library/eclipse-mosquitto@sha256:')),None)
     if not digest or '@sha256:' not in digest:raise ValueError('public Mosquitto image requires an immutable registry digest')
     images['broker']={'reference':digest,'platform':'linux/amd64','public_registry':True}
-  result=make_bundle(a.runtime,a.output,a.client,selected,a.controller_ip,images,[x for x in a.owners.split(',') if x],a.node,a.port_offset,a.save_images,a.client_port_offset)
+  result=make_bundle(a.runtime,a.output,a.client,selected,a.controller_ip,images,[x for x in a.owners.split(',') if x],a.node,a.port_offset,a.save_images,a.client_port_offset,a.images_archive)
  else:result=install(a.bundle,a.quota_gib,a.registry_user)
  print(json.dumps(result,indent=2))
 if __name__=='__main__':
