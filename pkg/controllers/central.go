@@ -101,8 +101,10 @@ func (c *Central) Handle(ctx context.Context, sender string, r mqttbus.Request) 
 		if !ok || sender != "edge-"+n.Node.ID || !Has(spec.AllowedZones, n.Node.Zone) || n.Endpoint != spec.Endpoint || n.Node.Available > spec.Quota {
 			return nil, errors.New("node identity, endpoint, zone or project quota not provisioned")
 		}
-		if e := n.Node.Validate(time.Now()); e != nil {
-			return nil, e
+		var clockErr error
+		n.Node, clockErr = authenticatedNodeAtReceipt(n.Node, time.Now(), false)
+		if clockErr != nil {
+			return nil, clockErr
 		}
 		old, exists := c.state.Nodes[n.Node.ID]
 		if exists && (n.Node.Generation < old.Node.Generation || n.Node.Generation == old.Node.Generation && n.Node.Zone != old.Node.Zone) {

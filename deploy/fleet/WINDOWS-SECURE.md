@@ -128,7 +128,7 @@ exportées dans `.runtime/measurements/` ; le lecteur conserve son propre export
 
 Le quota est un **plafond logique des blocs du projet**, réservés et stockés,
 partagé entre les espaces utilisateurs de cet Edge. Il ne réserve pas une
-partition du disque. Le nœud vérifie aussi l'espace libre. Après premier
+partition du disque. Une écriture réelle peut échouer si le disque est plein. Après premier
 lancement, changer le quota est refusé sans migration explicite, sans effacer
 les données. Les anciens A1/B1 sont configurés à 256 Mio chacun ; ce n'est pas
 une valeur universelle imposée à tous les appareils.
@@ -198,3 +198,11 @@ Le PC physique de Jules, ses règles réseau, OBS/caméra,
 les RPi/Jetson et la charge multi-producteurs restent à valider sur place.
 Les mesures live existantes restent des horodatages FFmpeg/lecteur ; elles ne
 mesurent pas seules la latence optique caméra-écran.
+
+Les contrôleurs tolèrent jusqu'à une seconde d'avance d'horloge d'un Edge
+authentifié : seules les dates légèrement futures des messages vivants sont
+ramenées à l'heure de réception. Les messages retenus/périmés ne gagnent aucune
+fraîcheur ; versions, générations et scheduler ne changent pas. Au-delà de cette
+borne, un diagnostic demande de synchroniser Windows/WSL. Cette correction côté
+contrôleur reste compatible avec les paquets clients construits à `f55fadc`.
+Leurs archives privées restent inchangées ; elles ne lancent aucun contrôleur.

@@ -84,6 +84,11 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 		if mqttbus.Decode(raw, &n) != nil {
 			return
 		}
+		var clockErr error
+		n, clockErr = authenticatedNodeAtReceipt(n, now, retained)
+		if clockErr != nil {
+			return
+		}
 		registrationMu.Lock()
 		owner, ok := registered[n.ID]
 		if !ok || owner.Node.Generation != n.Generation || n.Zone != z.ID {
@@ -152,6 +157,11 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 			}
 			if authoritative.Node.Generation != n.Node.Generation || authoritative.Node.Zone != z.ID || authoritative.Endpoint != n.Endpoint {
 				return nil, errors.New("node ownership not committed at central")
+			}
+			var clockErr error
+			n.Node, clockErr = authenticatedNodeAtReceipt(n.Node, time.Now(), false)
+			if clockErr != nil {
+				return nil, clockErr
 			}
 			registrationMu.Lock()
 			copy := n.Node
