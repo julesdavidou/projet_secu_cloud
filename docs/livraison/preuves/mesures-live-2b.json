@@ -1,0 +1,113 @@
+{
+  "live_id": "l-2b7355639662cbed9b8ce3d1b365ac45",
+  "browser_sha256": "0f7670a1b5168816f69e290ecc6064fc5e3ff99d39a6b40c4525b8b7a827d70e",
+  "scope": {
+    "samples": 154,
+    "observation_ms": 163022,
+    "download_attempts": 6,
+    "unique_sequences": [
+      17,
+      18,
+      21,
+      22,
+      24,
+      25
+    ],
+    "central_chunks_matched": 6
+  },
+  "metrics_ms": {
+    "first_display": 1671,
+    "fragment_duration": {
+      "n": 6,
+      "min": 24000,
+      "mean": 24000,
+      "median": 24000.0,
+      "p95": 24000.0,
+      "max": 24000
+    },
+    "owner_publish_sign_verify_store_combined": {
+      "n": 6,
+      "min": 4399,
+      "mean": 5152,
+      "median": 5049.5,
+      "p95": 6131.75,
+      "max": 6294
+    },
+    "programme_start_to_central_commit_estimate": {
+      "n": 6,
+      "min": 27597,
+      "mean": 28503.5,
+      "median": 28292.5,
+      "p95": 29384.5,
+      "max": 29390
+    },
+    "request_to_last_byte": {
+      "n": 6,
+      "min": 19,
+      "mean": 424,
+      "median": 25.5,
+      "p95": 1277.25,
+      "max": 1328
+    },
+    "time_to_first_byte": {
+      "n": 6,
+      "min": 8,
+      "mean": 412.667,
+      "median": 12.5,
+      "p95": 1267.75,
+      "max": 1320
+    },
+    "body_after_first_byte": {
+      "n": 6,
+      "min": 7,
+      "mean": 11.333,
+      "median": 9.0,
+      "p95": 19.25,
+      "max": 21
+    },
+    "server_reconstruction_combined_including_cache": {
+      "n": 6,
+      "min": 1.375,
+      "mean": 402.285,
+      "median": 1.861,
+      "p95": 1255.879,
+      "max": 1308.36
+    },
+    "programme_age_estimate": {
+      "n": 154,
+      "min": 16288,
+      "mean": 94586.318,
+      "median": 97885.5,
+      "p95": 136227.9,
+      "max": 172436
+    },
+    "stall_total": 5154
+  },
+  "playback": {
+    "stall_count": 2,
+    "stall_fraction_of_observation": 0.03161536479738931,
+    "dropped_frames": 0,
+    "source_video_observed": {
+      "codec": "h264",
+      "width": 728,
+      "height": 410,
+      "frames_per_second": 10
+    }
+  },
+  "unmeasured": [
+    "pure SIS fingerprint time",
+    "pure IBS signing time",
+    "pure IBS verification time",
+    "TLS encryption/decryption CPU cost",
+    "network-only transmission across all hops",
+    "camera-to-screen latency"
+  ],
+  "qualifications": [
+    "Browser data was replaced during analysis. This report uses only the immutable snapshot matching browser_sha256.",
+    "Body time is browser fetch tail after first byte; it is not Edge-to-server network latency.",
+    "Owner publish combines several phases and is not pure crypto time.",
+    "Server reconstruction includes retrieval/verification/cache effects and is inside total request time.",
+    "Programme age depends on publisher/server clocks and shows timeline jumps. It is not validated camera-to-screen latency.",
+    "Central statistics match the unique fragment sequences requested in this browser snapshot."
+  ]
+}

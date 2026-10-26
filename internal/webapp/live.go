@@ -66,7 +66,7 @@ func (s *Server) liveAPI(api *http.ServeMux) {
 }
 func liveManifest(state media.LiveState) string {
 	start := 0
-	if len(state.Chunks) > 6 {
+	if !state.Ended && len(state.Chunks) > 6 {
 		start = len(state.Chunks) - 6
 	}
 	target := int64(1)
@@ -78,7 +78,7 @@ func liveManifest(state media.LiveState) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-TARGETDURATION:%d\n#EXT-X-MEDIA-SEQUENCE:%d\n#EXT-X-INDEPENDENT-SEGMENTS\n", target, start)
 	if start < len(state.Chunks) {
-		fmt.Fprintf(&out, "#EXT-X-MAP:URI=\"segments/%d/init.mp4\"\n", start)
+		out.WriteString("#EXT-X-MAP:URI=\"segments/0/init.mp4\"\n")
 	}
 	for _, chunk := range state.Chunks[start:] {
 		fmt.Fprintf(&out, "#EXT-X-PROGRAM-DATE-TIME:%s\n#EXTINF:%.3f,\nsegments/%d/segment.m4s\n", time.UnixMilli(chunk.ProgramMS).UTC().Format(time.RFC3339Nano), float64(chunk.DurationMS)/1000, chunk.Sequence)

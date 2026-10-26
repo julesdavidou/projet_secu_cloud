@@ -1,11 +1,27 @@
 import json,tempfile,time,unittest
 from pathlib import Path
 from datetime import datetime,timezone
-from lan import peer_files
+from lan import peer_files,publish_file
+from unittest.mock import patch
 from broker_contract import outgoing
 from export_edge import export
 
 class NetworkContractTests(unittest.TestCase):
+ def test_windows_sharing_lock_is_retried_without_rewriting_unchanged_file(self):
+  import os
+  with tempfile.TemporaryDirectory() as folder:
+   target=Path(folder)/'hosts';target.write_text('old',encoding='ascii');replace=os.replace
+   with patch('lan.os.replace',side_effect=[PermissionError('sharing lock'),None]) as move,patch('lan.time.sleep'):
+    publish_file(target,'new');self.assertEqual(move.call_count,2)
+   replace(target.with_name('hosts.next'),target)
+   self.assertEqual(target.read_text(),'new')
+   with patch('lan.os.replace') as move:publish_file(target,'new');move.assert_not_called()
+ def test_persistent_sharing_lock_preserves_last_good_file(self):
+  with tempfile.TemporaryDirectory() as folder:
+   target=Path(folder)/'expires';target.write_text('0',encoding='ascii')
+   with patch('lan.os.replace',side_effect=PermissionError('sharing lock')),patch('lan.time.sleep'):
+    with self.assertRaises(PermissionError):publish_file(target,'25')
+   self.assertEqual(target.read_text(),'0')
  def test_mesh_never_forwards_another_actors_origin(self):
   cfg={'zones':['A','B'],'nodes':[{'id':'PI1'},{'id':'JETSON1'}]}
   for topic in outgoing(cfg,'PI1'):

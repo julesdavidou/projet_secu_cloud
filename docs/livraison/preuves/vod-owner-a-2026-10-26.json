@@ -1,0 +1,39 @@
+{
+  "owner": "client-455ae63a-35d5-4afc-a04d-0ad71960bb49",
+  "video_id": "v-85338f8973e0a197aecfed3854ae3bfd",
+  "source_sha256": "760377b11c6480dbd192017a65677a31563d5b7007f309e8970eff46168a3e1e",
+  "source_size": 1484048,
+  "publish_seconds": 19.804,
+  "cold_playback_seconds": 0.953,
+  "warm_playback_seconds": 0.05,
+  "integrity": "SIS-HESS-BLS12381-v3 + SHA256",
+  "physical_lab": "NOT_TESTED",
+  "service": {
+    "cost_microcredits": 27972,
+    "observations": {
+      "A1": {
+        "generation": 1,
+        "microcredits_per_gib_hour": 1000000,
+        "node_id": "A1",
+        "observed_at": "2026-10-26T10:56:43.910084648Z",
+        "probe_bytes_per_second": 48392265,
+        "rtt_microseconds": 1220,
+        "zone_id": "A"
+      },
+      "B1": {
+        "generation": 1,
+        "microcredits_per_gib_hour": 600000,
+        "node_id": "B1",
+        "observed_at": "2026-10-26T10:56:43.70189696Z",
+        "probe_bytes_per_second": 66379349,
+        "rtt_microseconds": 745,
+        "zone_id": "B"
+      }
+    },
+    "policy": {
+      "budget_microcredits": 100000,
+      "max_rtt_ms": 2000,
+      "retention_hours": 24
+    }
+  }
+}

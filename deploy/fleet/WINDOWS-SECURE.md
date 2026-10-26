@@ -1,5 +1,7 @@
 # Participants Windows : profil sécurisé V3
 
+> Guide de remise du 26 octobre : [installation et réseau](../../docs/livraison/DEMARRAGE.md), [live avec audio, budgets et relecture](../../docs/livraison/VIDEO-ET-MESURES.md), [preuves et limites après la démo](../../docs/livraison/VALIDATION.md). Les IP et états de validation ci-dessous décrivent la préparation initiale ; les correctifs de la démo sont maintenant intégrés dans les sources.
+
 Les outils Fleet de Jules et leur déploiement historique restent disponibles.
 Ce complément utilise **le même Edge Go**, les mêmes contrôleurs, les autorités
 SIS/IBS et le stockage V3. Ne pas raccorder les Edge Fleet HTTP/1884 à ce banc

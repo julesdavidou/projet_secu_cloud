@@ -20,6 +20,13 @@ def require(condition, message):
         raise RuntimeError(message)
 
 
+def storage_endpoint(unit, topology):
+    # The public placement API deliberately exposes node_id, not internal URLs.
+    nodes = {node['id']: node['endpoint'] for node in topology['nodes']}
+    require(unit['node_id'] in nodes, 'Nœud placé absent de la topologie déployée')
+    return nodes[unit['node_id']].rstrip('/')
+
+
 def run():
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
                                        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
@@ -67,9 +74,10 @@ def run():
         require(video in [item['id'] for item in js('/api/videos')['items']],'Vidéo absente du catalogue')
         passed('publication privée, segmentation, placement Go, stockage réel READY')
         stored_bytes = 0
+        topology = json.loads(Path('/config/config.json').read_text(encoding='utf-8'))
         for unit in units:
             token = (Path('/run/web-secrets')/('edge-'+unit['node_id']+'.http-token')).read_text().strip()
-            raw,_ = request(unit['endpoint']+'/store/'+urllib.parse.quote(video,safe='')+'/'+str(unit['extent_id']),
+            raw,_ = request(storage_endpoint(unit,topology)+'/store/'+urllib.parse.quote(video,safe='')+'/'+str(unit['extent_id']),
                             headers={'Authorization':'Bearer '+token},client=anonymous)
             require(hashlib.sha256(raw).hexdigest()==unit['sha256'],'SHA256 incorrect après relecture Edge')
             require(len(raw)==unit['size_bytes'],'Taille incorrecte après relecture Edge')

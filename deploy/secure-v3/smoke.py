@@ -39,7 +39,12 @@ with httpx.Client(verify=ssl_client(),timeout=240,trust_env=False) as c:
    refusal=c.post(BASE+'/api/videos/signed/quote',content=output.getvalue(),headers={'Content-Type':'application/x-tar'});assert refusal.status_code==409,(refusal.status_code,refusal.text)
   print('PASS real zone probes, quote without reservation, budget/RTT/price refusals',flush=True)
   r=c.post(OWNER+'/owner/retry',json={'video_id':video},headers={'X-CSRF-Token':csrf});assert r.status_code==201,(r.status_code,r.text)
-  published=r.json();assert published['id']==video and published['service']['cost_microcredits']==prepared['quote']['service']['cost_microcredits'];assert published['integrity'].startswith('SIS-HESS');publish_time=time.perf_counter()-start
+  published=r.json();assert published['id']==video
+  # A quote does not reserve capacity. Placement may change before publication,
+  # but the accepted policy and its maximum budget must remain authoritative.
+  assert published['service']['policy']==prepared['quote']['service']['policy']==policy
+  assert 0<published['service']['cost_microcredits']<=policy['budget_microcredits']
+  assert published['integrity'].startswith('SIS-HESS');publish_time=time.perf_counter()-start
   before=c.get(BASE+'/api/videos/'+video+'/placement');assert before.status_code==200
   retry=c.post(OWNER+'/owner/retry',json={'video_id':video},headers={'X-CSRF-Token':csrf});assert retry.status_code==201 and retry.json()['id']==video,(retry.status_code,retry.text)
   after=c.get(BASE+'/api/videos/'+video+'/placement');assert after.json()==before.json(),'retry changed committed placement'

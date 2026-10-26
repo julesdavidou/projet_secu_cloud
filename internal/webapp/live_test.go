@@ -16,8 +16,15 @@ func TestLivePlaylistOrderWindowEndAndSafeVODProfile(t *testing.T) {
 		t.Fatal(playlist)
 	}
 	state.Ended = true
-	if !strings.HasSuffix(liveManifest(state), "#EXT-X-ENDLIST\n") {
+	replay := liveManifest(state)
+	if !strings.HasSuffix(replay, "#EXT-X-ENDLIST\n") {
 		t.Fatal("no end")
+	}
+	if !strings.Contains(replay, "#EXT-X-MEDIA-SEQUENCE:0\n") || strings.Count(replay, "#EXTINF:") != len(state.Chunks) || !strings.Contains(replay, "segments/8/segment.m4s") {
+		t.Fatal("ended replay omitted stored fragments", replay)
+	}
+	if !strings.Contains(playlist, "#EXT-X-MAP:URI=\"segments/0/init.mp4\"") {
+		t.Fatal("sliding window changed the initialization URI", playlist)
 	}
 	movie := Movie{LayoutVersion: 3, RootID: "l-" + strings.Repeat("a", 32), OperationKind: "live_segment-0", NativeSource: true, Assets: []media.Asset{{Name: "original.mp4"}}}
 	if e := validateSignedPlaylist(movie); e != nil {

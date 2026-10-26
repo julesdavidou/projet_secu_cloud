@@ -1,5 +1,7 @@
 # Live signé et mesures — livraison du 20 octobre 2026
 
+> Pour l'état de remise et les correctifs intégrés dans main, voir le [guide du 26 octobre](../livraison/README.md) et le [parcours live avec audio](../livraison/VIDEO-ET-MESURES.md). Ce document conserve l'historique de la première intégration.
+
 Base vérifiée : `main` à `cfda3e3`, merge humain de la PR #6 contenant `880a869` et l'intégration V3 précédente. La branche `codex/live-secure-metrics` ajoute le live ; elle nécessite sa propre revue et n'est pas fusionnée automatiquement. Les rapports V3 décrivent leur état historique ; ce document décrit le nouveau lot.
 
 ## Démarrage Windows reproductible

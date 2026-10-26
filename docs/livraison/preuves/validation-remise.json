@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-26",
+  "platform": "Windows host / Linux AMD64 Docker Desktop",
+  "source_base": "825e2b22d5e28f188d358fadb61db7969337dbd7",
+  "scope": "Submission candidate with local hotfixes and delivery documentation. Final source identity is the rendered main Git SHA.",
+  "checks": {
+    "go_three_modules_test_race_vet": "PASS",
+    "frontend": {
+      "passed": 9
+    },
+    "fleet_windows": {
+      "discovered": 52,
+      "passed": 47,
+      "skipped_linux_only": 5
+    },
+    "fleet_linux_shell": {
+      "passed": 5,
+      "transport": "fake Docker, no SSH/network"
+    },
+    "real_crypto_and_video_contracts": {
+      "passed": 21,
+      "transport": "unit and contract tests, not physical LAN"
+    },
+    "lan_contracts": {
+      "passed": 4
+    },
+    "vod_real": {
+      "result": "PASS",
+      "owners": 2,
+      "zones": [
+        "A",
+        "B"
+      ],
+      "source": "synthetic real MP4 + AAC",
+      "original_bytes_equal": true,
+      "range_206": true
+    },
+    "live_real": {
+      "result": "PASS",
+      "fragments": 8,
+      "segment_seconds": 4,
+      "codecs": [
+        "h264",
+        "aac"
+      ],
+      "zones": [
+        "A",
+        "B"
+      ],
+      "rtmp": "real TCP RTMP in real time",
+      "identical_reconstructed_bytes": true,
+      "verified_before_source_end": true,
+      "private_access_and_revocation": "PASS"
+    },
+    "live_resilience": {
+      "result": "PASS",
+      "corruption": "detected and test file restored",
+      "absence": "detected and test file restored",
+      "restart": "full stack, durable order/head/end/privacy and identical cold reconstruction"
+    }
+  },
+  "evidence": [
+    "live-rtmp-audio-2026-10-26.json",
+    "vod-owner-a-2026-10-26.json",
+    "vod-owner-b-2026-10-26.json",
+    "mesures-live-2b.json",
+    "live-2b-browser.json",
+    "relecture-verifiee-2026-10-20.json"
+  ],
+  "not_claimed": [
+    "Physical Raspberry Pi/Jetson end-to-end validation",
+    "Guaranteed physical LAN four-second camera-to-screen latency",
+    "Speaker or microphone physical validation",
+    "Pure crypto/TLS stage timing",
+    "Automatic replication",
+    "Complete article compliance or cryptographic security proof"
+  ],
+  "ci": "Use the GitHub Actions results attached to the final source SHA; this local summary is not a substitute for CI."
+}

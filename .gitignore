@@ -46,3 +46,12 @@ deploy/live-v4/results/
 deploy/fleet/inventory.local.json
 deploy/fleet/.runtime/
 **/__pycache__/
+
+# Generated personal bundles: never publish credentials or runtime keys.
+**/.runtime/
+**/account.private.json
+**/owner-wallet.json
+**/*.key
+**/images.tar
+cariboutv-prive/
+paquets-prives/

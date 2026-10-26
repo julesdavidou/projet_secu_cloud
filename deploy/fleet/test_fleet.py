@@ -10,9 +10,15 @@ import unittest
 from unittest.mock import patch
 
 import fleet
+import runpy
 
 
 class FleetTests(unittest.TestCase):
+    def test_video_probe_resolves_node_id_from_deployed_topology(self):
+        endpoint = runpy.run_path(str(fleet.HERE/'test-video.py'))['storage_endpoint']
+        topology = {'nodes':[{'id':'PI1','endpoint':'http://192.168.2.76:18081/'}]}
+        self.assertEqual(endpoint({'node_id':'PI1'},topology),'http://192.168.2.76:18081')
+        with self.assertRaises(RuntimeError): endpoint({'node_id':'UNKNOWN'},topology)
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)

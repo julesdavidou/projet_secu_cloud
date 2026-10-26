@@ -35,3 +35,12 @@ deploy/live-v4/results/
 deploy/fleet/inventory.local.json
 deploy/fleet/.runtime/
 **/__pycache__/
+
+# Keep personal bundle credentials out of Docker build contexts as well.
+**/.runtime/
+**/account.private.json
+**/owner-wallet.json
+**/*.key
+**/images.tar
+cariboutv-prive/
+paquets-prives/

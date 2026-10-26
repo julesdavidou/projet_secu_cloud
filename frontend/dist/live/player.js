@@ -18,7 +18,7 @@ async function watch(){
  for(let attempts=0;attempts<120;attempts++){const {state}=await json('/api/live/'+liveID);if(state.chunks.length)break;if(state.ended)throw new Error('Direct terminé sans fragment');if(attempts===119)throw new Error('Premier fragment indisponible après deux minutes');await new Promise(resolve=>setTimeout(resolve,1000));}
  const url='/api/live/'+liveID+'/index.m3u8';
  if(Hls.isSupported()){
-  hls=new Hls({liveSyncDurationCount:2,liveMaxLatencyDurationCount:5,maxLiveSyncPlaybackRate:1.2,maxBufferLength:20,backBufferLength:12});hls.attachMedia(video);
+  hls=new Hls({liveSyncDurationCount:1,liveMaxLatencyDurationCount:3,maxLiveSyncPlaybackRate:1.2,maxBufferLength:12,backBufferLength:8});hls.attachMedia(video);
   hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls.loadSource(url));hls.on(Hls.Events.MANIFEST_PARSED,()=>video.play().catch(error));
   hls.on(Hls.Events.FRAG_LOADED,(_,d)=>{const stats=d.part?.stats||d.frag?.stats;const t=stats?.loading;if(t&&downloads.length<1024)downloads.push({sequence:d.frag.sn,bytes:stats.total,download_ms:t.end-t.start,ttfb_ms:t.first-t.start,server_timing:d.networkDetails?.getResponseHeader?.('Server-Timing')??null});});
   hls.on(Hls.Events.ERROR,(_,data)=>{if(data.fatal)error(new Error('Lecture interrompue : '+data.details));});

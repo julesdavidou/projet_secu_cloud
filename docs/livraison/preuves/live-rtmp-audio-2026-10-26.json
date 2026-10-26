@@ -1,0 +1,207 @@
+{
+  "live_id": "l-09c3f855d5904573a4735792e22bea05",
+  "measurements": [
+    {
+      "sequence": 0,
+      "source_sha256": "46df74a765cfab11a1389a41568a0355189f85b66e962361189ecb89541caef1",
+      "source_bytes": 156512,
+      "publish_request_ms": 2823.877,
+      "programme_age_at_commit_ms": 5304,
+      "pending_observed": 0,
+      "video_id": "v-eb762902299c50a220b77410007f7259",
+      "owner_publish_ms": 1591
+    },
+    {
+      "sequence": 1,
+      "source_sha256": "8e30fe2d20278bf742cef08a32b6b72504ade73ef0453716ac5e4e9350840c25",
+      "source_bytes": 161588,
+      "publish_request_ms": 3459.1,
+      "programme_age_at_commit_ms": 5988,
+      "pending_observed": 0,
+      "video_id": "v-d2bd5fc6c85955782dd116d3f4e654b8",
+      "owner_publish_ms": 1678
+    },
+    {
+      "sequence": 2,
+      "source_sha256": "02ee4983e4f686b421d8078cbb818a3fc68e8776969cd8f9aa97c42a71d32d0a",
+      "source_bytes": 154146,
+      "publish_request_ms": 2852.178,
+      "programme_age_at_commit_ms": 5287,
+      "pending_observed": 0,
+      "video_id": "v-be0dcbd5be71e14eb40219d1393c40bd",
+      "owner_publish_ms": 1706
+    },
+    {
+      "sequence": 3,
+      "source_sha256": "ef1e3ae0a2d0298c2f80a80ea21f396b690c714b0fae5781cc30644dad41957d",
+      "source_bytes": 158063,
+      "publish_request_ms": 3032.433,
+      "programme_age_at_commit_ms": 5521,
+      "pending_observed": 0,
+      "video_id": "v-5c6ddf7a35eef350dc121822f4d0f479",
+      "owner_publish_ms": 1816
+    },
+    {
+      "sequence": 4,
+      "source_sha256": "42bb7f8369a0dc801edcb6c43c877b992bdba0cdfd1389dd2c18de83311ad09e",
+      "source_bytes": 163742,
+      "publish_request_ms": 2792.683,
+      "programme_age_at_commit_ms": 5368,
+      "pending_observed": 0,
+      "video_id": "v-df08ca9426477e3fe6e154b0475151ec",
+      "owner_publish_ms": 1607
+    },
+    {
+      "sequence": 5,
+      "source_sha256": "108b567c00b70cf69f17b07040b7472a19f3796a57b79d1557d4d11bbe057365",
+      "source_bytes": 154712,
+      "publish_request_ms": 2904.965,
+      "programme_age_at_commit_ms": 5475,
+      "pending_observed": 0,
+      "video_id": "v-0f9ab8168a0fd319d630fa8ae53a297b",
+      "owner_publish_ms": 1750
+    },
+    {
+      "sequence": 6,
+      "source_sha256": "3006b31806ed6fb21cd1991b6d140992e43c1d446302e0602b8cd4732cf751e1",
+      "source_bytes": 159823,
+      "publish_request_ms": 2915.835,
+      "programme_age_at_commit_ms": 5455,
+      "pending_observed": 0,
+      "video_id": "v-3ad1f99fa0af487d63d868304b0d17c8",
+      "owner_publish_ms": 1706
+    },
+    {
+      "sequence": 7,
+      "source_sha256": "b78f7bd29669b350bf7c51e18b2e6c16022f3466bb1dd114833ccfe3f77a7291",
+      "source_bytes": 164595,
+      "publish_request_ms": 2857.849,
+      "programme_age_at_commit_ms": 5315,
+      "pending_observed": 0,
+      "video_id": "v-ea97794cf06ebd8a61e44baffb3aba4e",
+      "owner_publish_ms": 1642
+    }
+  ],
+  "clock_basis": "FFmpeg programme date-time, not camera capture; clocks must agree",
+  "physical_lab": "NOT_TESTED",
+  "end_reason": "source_finished",
+  "wall_seconds": 37.678,
+  "reference_quality": {
+    "method": "decoded frames paired by ordinal position, full retained source reference; timestamps normalized ONLY for image comparison, not latency or timing fidelity",
+    "reference_frames": 768,
+    "reconstructed_frames": 768,
+    "ssim": 1.0,
+    "psnr": "inf"
+  },
+  "reauth_interval_seconds_for_test": 5,
+  "passed": true,
+  "rtmp": "real FFmpeg TCP in real time",
+  "verified_before_source_end": true,
+  "source": "synthetic test pattern",
+  "storage": "actual isolated Edge files",
+  "zones": [
+    "A",
+    "B"
+  ],
+  "verified_fragments": [
+    {
+      "sequence": 0,
+      "video_id": "v-eb762902299c50a220b77410007f7259",
+      "bytes": 156512,
+      "sha256": "46df74a765cfab11a1389a41568a0355189f85b66e962361189ecb89541caef1",
+      "verified_read_decode_ms": 4747.64,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 1,
+      "video_id": "v-d2bd5fc6c85955782dd116d3f4e654b8",
+      "bytes": 161588,
+      "sha256": "8e30fe2d20278bf742cef08a32b6b72504ade73ef0453716ac5e4e9350840c25",
+      "verified_read_decode_ms": 1352.467,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 2,
+      "video_id": "v-be0dcbd5be71e14eb40219d1393c40bd",
+      "bytes": 154146,
+      "sha256": "02ee4983e4f686b421d8078cbb818a3fc68e8776969cd8f9aa97c42a71d32d0a",
+      "verified_read_decode_ms": 1071.959,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 3,
+      "video_id": "v-5c6ddf7a35eef350dc121822f4d0f479",
+      "bytes": 158063,
+      "sha256": "ef1e3ae0a2d0298c2f80a80ea21f396b690c714b0fae5781cc30644dad41957d",
+      "verified_read_decode_ms": 1046.107,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 4,
+      "video_id": "v-df08ca9426477e3fe6e154b0475151ec",
+      "bytes": 163742,
+      "sha256": "42bb7f8369a0dc801edcb6c43c877b992bdba0cdfd1389dd2c18de83311ad09e",
+      "verified_read_decode_ms": 1084.788,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 5,
+      "video_id": "v-0f9ab8168a0fd319d630fa8ae53a297b",
+      "bytes": 154712,
+      "sha256": "108b567c00b70cf69f17b07040b7472a19f3796a57b79d1557d4d11bbe057365",
+      "verified_read_decode_ms": 1037.338,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "B"
+      ]
+    },
+    {
+      "sequence": 6,
+      "video_id": "v-3ad1f99fa0af487d63d868304b0d17c8",
+      "bytes": 159823,
+      "sha256": "3006b31806ed6fb21cd1991b6d140992e43c1d446302e0602b8cd4732cf751e1",
+      "verified_read_decode_ms": 1145.314,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "A"
+      ]
+    },
+    {
+      "sequence": 7,
+      "video_id": "v-ea97794cf06ebd8a61e44baffb3aba4e",
+      "bytes": 164595,
+      "sha256": "b78f7bd29669b350bf7c51e18b2e6c16022f3466bb1dd114833ccfe3f77a7291",
+      "verified_read_decode_ms": 1143.847,
+      "video_codec": "h264",
+      "audio_codec": "aac",
+      "zones": [
+        "B"
+      ]
+    }
+  ],
+  "access_revoked": true,
+  "ordered_gap_refused": true,
+  "append_after_end_refused": true
+}

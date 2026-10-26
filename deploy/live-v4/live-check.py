@@ -42,13 +42,16 @@ with tempfile.TemporaryDirectory(prefix='real-live-') as folder:
    assert a.content==init and b.content==fragment,'not real identical Edge reconstruction'
    clip=folder/('read-'+str(seq)+'.mp4');clip.write_bytes(a.content+b.content)
    subprocess.run(['ffmpeg','-v','error','-i',str(clip),'-f','null','-'],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+   streams=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=codec_type,codec_name','-of','json',str(clip)]))['streams']
+   assert any(s['codec_type']=='video' and s['codec_name']=='h264' for s in streams),'reconstructed H.264 video missing'
+   assert any(s['codec_type']=='audio' and s['codec_name']=='aac' for s in streams),'reconstructed AAC sound missing'
    r=viewer.get(WEB+'/api/videos/'+child+'/placement');r.raise_for_status();zones={u['zone_id'] for u in r.json()['units']};seen.update(zones)
    # Retry exact first publication: same bytes, same signed operation/head.
    body={'live_id':live,'action_id':'live-chunk-'+hashlib.sha256((live+'/'+str(seq)).encode()).hexdigest()[:32],'sequence':seq,'duration_ms':item['duration_ms'],'program_unix_ms':item['program_unix_ms'],'init':base64.b64encode(init).decode(),'fragment':base64.b64encode(fragment).decode(),'service_policy':policy(seq)}
    if seq==0:
     replay=owner.post(OWNER+'/owner/live/segment',json=body,headers=headers);assert replay.status_code==200 and replay.json()['state']['chunks'][0]['video_id']==child,(replay.status_code,replay.text)
     bad={**body,'sequence':1000,'action_id':'live-gap-'+secrets.token_hex(16)};r=owner.post(OWNER+'/owner/live/segment',json=bad,headers=headers);assert r.status_code==422
-   reports.append({'sequence':seq,'video_id':child,'bytes':len(init)+len(fragment),'sha256':hashlib.sha256(init+fragment).hexdigest(),'verified_read_decode_ms':round((time.perf_counter()-started)*1000,3),'zones':sorted(zones)})
+   reports.append({'sequence':seq,'video_id':child,'bytes':len(init)+len(fragment),'sha256':hashlib.sha256(init+fragment).hexdigest(),'verified_read_decode_ms':round((time.perf_counter()-started)*1000,3),'video_codec':'h264','audio_codec':'aac','zones':sorted(zones)})
   args=SimpleNamespace(hls_dir=capture,owner_url=OWNER,email='secure-owner-a@example.invalid',title='Live integration '+secrets.token_hex(8),public=False,file=None,rtmp_listen=url,transcode=False,segment_seconds=4,max_pending=16,max_seconds=300,idle_timeout=60,reauth_seconds=5,policy=policy(0))
   thread.start()
   try:

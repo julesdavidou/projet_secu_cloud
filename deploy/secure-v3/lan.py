@@ -13,6 +13,17 @@ from zeroconf import Zeroconf,ServiceBrowser,ServiceInfo,IPVersion,InterfaceChoi
 SERVICE='_caribou-edge._tcp.local.'
 IDENTITY=re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,100}$')
 
+def publish_file(path,value):
+ """Keep atomic publication despite short Windows/Docker sharing locks."""
+ path=Path(path)
+ if path.exists() and path.read_text(encoding='ascii')==value:return
+ temp=path.with_name(path.name+'.next');temp.write_text(value,encoding='ascii')
+ for attempt in range(6):
+  try:os.replace(temp,path);return
+  except PermissionError:
+   if attempt==5:raise
+   time.sleep(0.1*(attempt+1))
+
 def private_ip(value):
  ip=ipaddress.ip_address(value)
  if ip.version!=4 or not ip.is_private or ip.is_loopback or ip.is_link_local:raise ValueError('private LAN IPv4 required')
@@ -51,7 +62,7 @@ def peer_files(output,routes,topology,self_node):
  folder=Path(output);folder.mkdir(parents=True,exist_ok=True)
  # Keep lease renewal separate: an unchanged peer set must not restart brokers.
  for name,value in [('hosts','\n'.join(hosts)+'\n'),('peers.conf','\n'.join(config)+'\n'),('expires',str(int(min(expiry))) if expiry else '0')]:
-  temp=folder/(name+'.next');temp.write_text(value,encoding='ascii');os.replace(temp,folder/name)
+  publish_file(folder/name,value)
 
 class Listener:
  def __init__(self):self.lock=threading.Lock();self.values={}
@@ -110,7 +121,7 @@ def browse(args):
      r=zone_request(c,'GET',args.zone_url,'/api/v1/discovery/routes',args.zone_ip);r.raise_for_status();routes=r.json()
      if args.output:peer_files(args.output,routes,json.loads(Path(args.topology).read_text(encoding='utf-8')),args.self_node)
      if args.results:Path(args.results).write_text(json.dumps(routes,indent=2),encoding='utf-8')
-    except httpx.HTTPError as e:print('DIRECTORY_UNAVAILABLE',type(e).__name__,flush=True)
+    except (httpx.HTTPError,OSError) as e:print('DIRECTORY_UNAVAILABLE',type(e).__name__,flush=True)
     time.sleep(2)
     # DNS-SD cache entries outlive the admission lease. Refresh from the
     # library's live cache so services are periodically re-probed by the zone.
@@ -124,7 +135,7 @@ def mesh(args):
   while not args.duration or time.monotonic()-start<args.duration:
    try:
     r=zone_request(c,'GET',args.zone_url,'/api/v1/discovery/routes',args.zone_ip);r.raise_for_status();peer_files(args.output,r.json(),json.loads(Path(args.topology).read_text(encoding='utf-8')),args.self_node)
-   except httpx.HTTPError as e:print('DIRECTORY_UNAVAILABLE',type(e).__name__,flush=True)
+   except (httpx.HTTPError,OSError) as e:print('DIRECTORY_UNAVAILABLE',type(e).__name__,flush=True)
    time.sleep(5)
 
 def main():

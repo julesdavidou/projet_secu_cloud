@@ -1,103 +1,53 @@
-# projet_secu_cloud
+# CaribouTV — stockage distribué et diffusion vidéo sécurisée
 
-> **Live signé (20/10)** : [OBS/fichier, mesures, décisions et preuves](docs/live-v4/LIVRAISON.md). Banc indépendant : `./deploy/live-v4/start.ps1`, lecteur `http://localhost:20690/live/`. Branche dédiée à revoir, aucun merge automatique.
+Ce dépôt rassemble le travail du groupe : authentification Java, interface web, catalogue Central SQLite, contrôleurs de zone, scheduler Go, agents Edge et chaîne vidéo avec audio AAC.
 
-> **Branche intégrée CaribouTV (19/10)** : [démarrage et tests PC/laboratoire](deploy/integration/README.md), [audit et branches](docs/integration/AUDIT-2026-10-19.md). Le Compose racine décrit ci-dessous reste le déploiement Edge historique ; le nouveau banc complet se lance avec `deploy/integration/start.ps1`.
+**Pour installer, présenter ou évaluer le projet, commencer par le [guide de livraison](docs/livraison/README.md).** Il décrit la version intégrée, les commandes exactes, les données persistantes et les limites observées.
 
-Projet de développement d'une architecture **Edge Computing distribuée** pour le stockage et la diffusion sécurisée de données vidéo.
+## Ce qui fonctionne et ce que cela signifie
 
-L'objectif est de construire une plateforme capable de déployer plusieurs nœuds Edge sur des machines hétérogènes, notamment :
+- Une vidéo est découpée, signée par l'agent de son propriétaire, placée par Go, stockée réellement sur les Edge puis reconstruite avec vérification.
+- Un direct entre par un fichier ou OBS en RTMP/TCP. Il suit le même parcours sécurisé sous forme de fragments HLS avec vidéo H.264 et audio AAC.
+- Les rôles contrôleur, stockage, publication et lecture sont distincts. Un PC peut en cumuler plusieurs.
+- Le mot « distribué » signifie que les blocs sont répartis entre des Edge. Cette livraison n'ajoute pas de réplication automatique : un Edge détenant un bloc doit rester disponible pour sa lecture.
+- Les mesures disponibles ne constituent pas une mesure optique caméra-écran. La faible latence et la conformité complète à l'article ne sont pas déclarées acquises.
 
-- PC classiques ;
-- machines Linux ;
-- Jetson Nano / ARM64 ;
-- environnement Docker.
+## Choisir le bon déploiement
 
-Les nœuds Edge doivent pouvoir :
+| Besoin | Point d'entrée | Usage |
+|---|---|---|
+| Version sécurisée intégrée, contrôleurs sur un PC | `deploy/secure-v3/start.ps1` puis `deploy/fleet/resume-controllers.ps1` | Profil principal de la livraison ; frontend local sur 19690 |
+| Participant Windows avec ses rôles autorisés | Un bundle privé exporté par `deploy/fleet/prepare-client.ps1` | Dans le bundle : `start.ps1`, `publish.ps1`, frontend sur 18790 |
+| Banc de validation live indépendant | `deploy/live-v4/start.ps1` | Autres ports et volumes ; lecteur sur 20690 ; utilisé en CI |
+| Déploiement Fleet de Jules sur SSH/GHCR | `deploy/fleet/deploy.ps1` | Profil HTTP historique, frontend sur 18090 ; ne pas le confondre avec le profil mTLS |
+| Agent Edge historique seul | `compose.yaml` à la racine | Préservé ; [documentation historique](docs/livraison/ANCIEN-README-EDGE.md) |
 
-- stocker des données localement ;
-- communiquer avec le control plane via MQTT ;
-- exposer leur état et leurs ressources ;
-- recevoir et restituer des données ;
-- être ajoutés ou supprimés dynamiquement ;
-- isoler les données appartenant aux différents utilisateurs.
+**Ne pas lancer tous les bancs pour une même démonstration.** Les ports 18090, 19690 et 20690 désignent des déploiements différents.
 
----
+## Lire la documentation
 
-# Architecture actuelle
+1. [Vue d'ensemble et parcours de démonstration](docs/livraison/README.md).
+2. [Installation, comptes et raccord des machines](docs/livraison/DEMARRAGE.md).
+3. [Architecture, stockage, MQTT et sécurité](docs/livraison/ARCHITECTURE.md).
+4. [Live, son, relecture et mesures](docs/livraison/VIDEO-ET-MESURES.md).
+5. [Dépannage Windows, Docker et réseau](docs/livraison/DEPANNAGE.md).
+6. [Tests, preuves de la démo et limites](docs/livraison/VALIDATION.md).
 
-Le projet deploie uniquement l'Edge Agent. Il utilise le broker MQTT deja present dans l'infrastructure ; aucun broker n'est fourni par Docker Compose.
+Les documents des étapes précédentes restent disponibles dans `docs/placement`, `docs/integration`, `docs/edge-v2`, `docs/conformity-v3` et `docs/live-v4`. Les décisions proposées ou états de validation anciens n'y sont pas tous des garanties de la version finale : le guide de livraison précise la portée actuelle.
 
-```text
-                 Control Plane
-                       |
-                      MQTT
-                       |
-              Broker MQTT existant
-                  /         \
-                MQTT        MQTT
-                 |            |
-          Edge Agent 01  Edge Agent 02
-                 |            |
-          stockage local stockage local
-```
+## Repères dans le code
 
-# Demarrage
+| Dossier | Responsabilité |
+|---|---|
+| `cmd`, `pkg/controllers`, `internal/edgecontrol` | Exécutables Go, contrôle, catalogue et passerelle Edge |
+| `pkg/placement`, `lab/placement`, `serveur-zone/app` | Scheduler et intégration avec le contrôleur de zone existant |
+| `auth` | Comptes, sessions et identifiants stables Java |
+| `frontend/dist` | Interface et lecteur live |
+| `videostreaming`, `integrations/video` | Découpage, signatures SIS/IBS, publication et reconstruction |
+| `deploy/fleet` | Déploiement SSH/GHCR existant et bundles Windows sécurisés |
+| `deploy/secure-v3`, `deploy/live-v4` | Compose, autorités, stockage isolé et bancs de validation |
+| `.github/workflows` | Compilation, tests, intégrations et images AMD64/ARM64 |
 
-```sh
-cp .env.example .env
-docker compose up -d --build
-docker compose ps
-docker compose logs -f edge-agent
-```
+## Données privées
 
-Renseigner `MQTT_BROKER` dans `.env` avec l'adresse du broker existant, accessible depuis le conteneur. Exemple a remplacer par l'adresse reelle :
-
-```dotenv
-MQTT_BROKER=tcp://ADRESSE_DU_BROKER:1883
-```
-
-Si le broker exige une authentification, renseigner aussi `MQTT_USERNAME` et `MQTT_PASSWORD` dans `.env` (fichier ignore par Git et exclu de la construction Docker).
-
-Si `MQTT_BROKER` est vide, MQTT est desactive. L'API HTTP, le monitoring et le stockage restent disponibles. Apres modification de `.env`, appliquer la configuration avec `docker compose up -d`.
-
-L'API est accessible sur `http://127.0.0.1:8080` depuis la machine qui execute Docker :
-
-| Methode et route | Fonction |
-| --- | --- |
-| `GET /health` | Disponibilite de l'API |
-| `GET /status` | Identite et ressources du noeud |
-| `PUT /v1/storage/{tenant}/{object}` | Envoi ou remplacement d'un fichier |
-| `GET /v1/storage/{tenant}/{object}` | Recuperation d'un fichier |
-| `DELETE /v1/storage/{tenant}/{object}` | Suppression d'un fichier |
-
-Les fichiers sont conserves dans le volume `edge-data`, monte dans `/data`. La separation par repertoire ne remplace pas l'authentification et les droits d'acces des clients.
-
-Pour arreter l'agent en conservant son conteneur et ses donnees :
-
-```sh
-docker compose stop
-```
-
-Pour retirer les conteneurs et le reseau en conservant le volume de stockage :
-
-```sh
-docker compose down
-```
-
-## Interface web CaribouTV
-
-Le frontend responsive est dans `frontend/` (HTML, CSS et JavaScript natifs). Il démarre avec un catalogue vide, sans vidéos ni activité fictives. Aucun backend web n'est ajouté.
-
-Avec Node.js 20 ou plus récent, depuis la racine du dépôt :
-
-```sh
-cd frontend
-npm run dev
-```
-
-Ouvrir http://127.0.0.1:5173/ ; aucune installation de dépendances n'est nécessaire. `npm test` lance les tests du frontend. La procédure complète et le contrat proposé pour la future API web Go sont dans [frontend/README.md](frontend/README.md).
-
-## Intégration Edge MQTT et reconstruction V2
-
-Banc isolé avec vrais brokers Edge, MQTT3/5, stockage et reconstruction sur Edge : [guide PowerShell](docs/edge-v2/DEMARRAGE.md), [livraison et limites](docs/edge-v2/LIVRAISON.md), [matrice des contrats](docs/edge-v2/CONTRATS-ET-CONFLITS.md).
+Git contient le code, les configurations d'exemple et des preuves expurgées. Il ne contient ni les clés de la démo, ni ses mots de passe, ni ses volumes Docker, ni les bundles privés. **Un clone de main ne restaure pas les vidéos et identités d'une installation existante.** Voir la procédure de sauvegarde avant de changer de machine.

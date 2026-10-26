@@ -18,12 +18,14 @@ def boxes(raw):
   out.append(kind);pos+=size
  return out
 
-def fragment_package(raw,output,video,duration_ms):
+def fragment_package(raw,output,video,duration_ms,block_size=None):
  if not 1<=duration_ms<=60000:raise ValueError('invalid live duration')
- blocks=segment_to_blocks(video,'original.mp4',0,raw,125000);files=[]
- asset={'name':'original.mp4','size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'block_size':125000,'blocks':[]}
+ block_size=int(os.environ.get('LIVE_BLOCK_SIZE','1048576')) if block_size is None else block_size
+ if type(block_size)is not int or not 1<=block_size<=1024*1024:raise ValueError('invalid live block size')
+ blocks=segment_to_blocks(video,'original.mp4',0,raw,block_size);files=[]
+ asset={'name':'original.mp4','size_bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest(),'block_size':block_size,'blocks':[]}
  for b in blocks:
-  value=raw[b.block_index*125000:(b.block_index+1)*125000];name=f'block-{b.block_index:05d}.bin';(output/name).write_bytes(value)
+  value=raw[b.block_index*block_size:(b.block_index+1)*block_size];name=f'block-{b.block_index:05d}.bin';(output/name).write_bytes(value)
   asset['blocks'].append({'index':b.block_index,'extent_id':b.block_index,'size_bytes':len(value),'sha256':hashlib.sha256(value).hexdigest()});files.append(name)
  return {'files':files,'assets':[asset],'native_source':True,'playlist':'','duration':duration_ms/1000}
 
