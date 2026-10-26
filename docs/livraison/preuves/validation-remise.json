@@ -5,6 +5,8 @@
   "scope": "Submission candidate with local hotfixes and delivery documentation. Final source identity is the rendered main Git SHA.",
   "checks": {
     "go_three_modules_test_race_vet": "PASS",
+    "service_clock_regression": "PASS: current time after peer calls; quote/reserve and local lock wait; genuinely future/expired measurements still refused; complete Go suite rerun",
+    "live_after_clock_fix": "PASS: 8 H264/AAC fragments, exact Edge reconstruction A/B, first verified before source end, private access/revocation/order",
     "frontend": {
       "passed": 9
     },
@@ -61,6 +63,7 @@
   },
   "evidence": [
     "live-rtmp-audio-2026-10-26.json",
+    "live-horloge-audio-2026-10-26.json",
     "vod-owner-a-2026-10-26.json",
     "vod-owner-b-2026-10-26.json",
     "mesures-live-2b.json",

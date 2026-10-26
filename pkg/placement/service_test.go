@@ -86,6 +86,71 @@ func TestPriceRoundingAndOverflow(t *testing.T) {
 	}
 }
 
+type serviceClockPeer struct {
+	zone *Zone
+	now  time.Time
+}
+
+func (p serviceClockPeer) Offer(_ context.Context, r ReservationRequest) (Reservation, error) {
+	return p.zone.Offer(r, p.now)
+}
+func (p serviceClockPeer) Reserve(_ context.Context, r ReservationRequest) (Reservation, error) {
+	return p.zone.Reserve(r, p.now)
+}
+func (p serviceClockPeer) Release(_ context.Context, id string) error { return p.zone.Release(id) }
+
+func TestDistributedServiceObservationCollectedDuringRequest(t *testing.T) {
+	for _, dry := range []bool{false, true} {
+		t.Run(map[bool]string{false: "reserve", true: "quote"}[dry], func(t *testing.T) {
+			start := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+			measured := start.Add(time.Second)
+			finished := start.Add(2 * time.Second)
+			a, b := NewZone("A", time.Minute), NewZone("B", time.Minute)
+			if e := b.Upsert(node("B1", "B", 100, start), start); e != nil {
+				t.Fatal(e)
+			}
+			o := Observation{NodeID: "B1", ZoneID: "B", Generation: 1, RTTMicros: 1, ProbeBytesPerSecond: 10000, Rate: 1, Observed: measured}
+			if e := b.Observe(o, measured); e != nil {
+				t.Fatal(e)
+			}
+			cache := NewSummaryCache()
+			if e := cache.Put(b.Summary(start), start); e != nil {
+				t.Fatal(e)
+			}
+			c := Coordinator{Local: a, Cache: cache, Timeout: time.Second, SummaryTTL: time.Minute, Clock: func() time.Time { return finished }, Neighbors: []Neighbor{{ID: "B", Peer: serviceClockPeer{b, finished}}}}
+			m := Manifest{RequestID: "during-request", VideoID: "v", SourceNodeID: "A1", Total: 10, Segments: []Segment{{ID: 0, Size: 10}}}
+			plan, e := c.distribute(context.Background(), m, 1, start, time.Minute, &ServicePolicy{Hours: 1}, dry)
+			if e != nil || len(plan.Assignments) != 1 || plan.Assignments[0].ZoneID != "B" {
+				t.Fatalf("legitimate measurement received during RPC rejected: %+v %v", plan, e)
+			}
+			if _, e := Quote(&ServicePolicy{Hours: 1}, plan.Assignments, plan.Service.Observations, start); e == nil {
+				t.Fatal("regression fixture did not exercise the earlier timestamp")
+			}
+			for _, invalidTime := range []time.Time{measured.Add(-time.Nanosecond), measured.Add(31 * time.Second)} {
+				if _, e := Quote(&ServicePolicy{Hours: 1}, plan.Assignments, plan.Service.Observations, invalidTime); e == nil {
+					t.Fatal("future or expired observations must still be refused")
+				}
+			}
+		})
+	}
+}
+
+func TestZoneServiceObservationAcceptedAfterCallerClock(t *testing.T) {
+	start := time.Now()
+	measured := start.Add(time.Millisecond)
+	z := NewZone("A", time.Minute)
+	if e := z.Upsert(node("A1", "A", 100, start), start); e != nil {
+		t.Fatal(e)
+	}
+	if e := z.Observe(Observation{NodeID: "A1", ZoneID: "A", Generation: 1, RTTMicros: 1, ProbeBytesPerSecond: 10000, Rate: 1, Observed: measured}, measured); e != nil {
+		t.Fatal(e)
+	}
+	r, e := z.Offer(ReservationRequest{RequestID: "r", VideoID: "v", ReservationID: "res", Expires: start.Add(time.Minute), Extents: []Extent{{ID: 0, Size: 10}}, Policy: &ServicePolicy{Hours: 1}}, start)
+	if e != nil || len(r.Plan) != 1 {
+		t.Fatalf("observation validated at ingestion rejected after lock wait: %+v %v", r, e)
+	}
+}
+
 func TestLostPlanAcknowledgementKeepsReservationLease(t *testing.T) {
 	now := time.Now()
 	z := NewZone("A", time.Minute)

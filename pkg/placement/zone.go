@@ -287,6 +287,11 @@ func (z *Zone) Commit(id string, now time.Time) error {
 // already validated its timestamps against the ingestion clock; use the newer
 // observation for this operation, without weakening pure Plan validation.
 func (z *Zone) operationTime(now time.Time) time.Time {
+	for _, observation := range z.observations {
+		if observation.Observed.After(now) {
+			now = observation.Observed
+		}
+	}
 	for _, n := range z.nodes {
 		if n.Updated.After(now) {
 			now = n.Updated

@@ -70,7 +70,7 @@ func RunZone(ctx context.Context, cfg Config, z *placement.Zone, onNode func(Reg
 		default:
 		}
 	}
-	coordinator := &placement.Coordinator{Local: z, Cache: cache, Fanout: cfg.Fanout, Timeout: 2 * time.Second, SummaryTTL: time.Duration(cfg.NodeTTLSeconds) * time.Second}
+	coordinator := &placement.Coordinator{Local: z, Cache: cache, Fanout: cfg.Fanout, Timeout: 2 * time.Second, SummaryTTL: time.Duration(cfg.NodeTTLSeconds) * time.Second, Clock: time.Now}
 	state := func(topic string, raw []byte, retained bool) {
 		now := time.Now()
 		if strings.HasSuffix(topic, "/summary") {

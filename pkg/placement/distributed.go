@@ -61,6 +61,10 @@ type Coordinator struct {
 	Fanout     int
 	Timeout    time.Duration
 	SummaryTTL time.Duration
+	// Clock refreshes time after peer calls. A service observation collected
+	// during an RPC must not be compared with the request's earlier timestamp.
+	// Nil preserves the explicit clock used by deterministic callers.
+	Clock func() time.Time
 }
 type DistributedPlan struct {
 	RequestID    string            `json:"request_id"`
@@ -97,6 +101,14 @@ func (c *Coordinator) OfferWithPolicy(ctx context.Context, m Manifest, target ui
 }
 
 func (c *Coordinator) distribute(ctx context.Context, m Manifest, target uint64, now time.Time, lease time.Duration, policy *ServicePolicy, dry bool) (DistributedPlan, error) {
+	currentTime := func() time.Time {
+		if c.Clock != nil {
+			if current := c.Clock(); current.After(now) {
+				return current
+			}
+		}
+		return now
+	}
 	if e := policy.Validate(); e != nil {
 		return DistributedPlan{}, e
 	}
@@ -133,10 +145,10 @@ func (c *Coordinator) distribute(ctx context.Context, m Manifest, target uint64,
 	}
 	var local Reservation
 	if dry {
-		local, err = c.Local.Offer(request(c.Local.ID, extents), now)
+		local, err = c.Local.Offer(request(c.Local.ID, extents), currentTime())
 		out.State = "PLANNED"
 	} else {
-		local, err = c.Local.Reserve(request(c.Local.ID, extents), now)
+		local, err = c.Local.Reserve(request(c.Local.ID, extents), currentTime())
 	}
 	if err != nil {
 		return DistributedPlan{}, err
@@ -164,7 +176,7 @@ func (c *Coordinator) distribute(ctx context.Context, m Manifest, target uint64,
 	neighbors := []Neighbor{}
 	summaries := map[string]Summary{}
 	for _, n := range c.Neighbors {
-		if s, ok := c.Cache.Get(n.ID, now, c.SummaryTTL); ok {
+		if s, ok := c.Cache.Get(n.ID, currentTime(), c.SummaryTTL); ok {
 			neighbors = append(neighbors, n)
 			summaries[n.ID] = s
 		}
@@ -260,7 +272,7 @@ func (c *Coordinator) distribute(ctx context.Context, m Manifest, target uint64,
 		rollback()
 		return DistributedPlan{}, ErrCapacity
 	}
-	out.Service, err = Quote(policy, out.Assignments, observed, now)
+	out.Service, err = Quote(policy, out.Assignments, observed, currentTime())
 	if err != nil {
 		rollback()
 		return DistributedPlan{}, err

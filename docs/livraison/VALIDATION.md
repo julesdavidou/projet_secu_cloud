@@ -36,6 +36,8 @@ Un premier essai de ce banc a utilisé par erreur le port d'un ancien agent prop
 
 Le résumé machine de la remise est dans [preuves/validation-remise.json](preuves/validation-remise.json). Les résultats de CI associés au SHA final complètent ces preuves, notamment le navigateur et l'émulation ARM.
 
+Une première exécution CI du live sur la PR a rencontré un refus de placement HTTP 409 après le premier fragment. L'inspection a révélé un défaut temporel reproductible : la validation finale comparait une mesure reçue pendant l'échange entre zones à l'heure du début de la demande. Le contrôleur actualise maintenant son horloge avant la vérification finale. Deux régressions déterministes couvrent cette situation dans le devis, la réservation et l'attente du verrou local. Les mesures réellement futures ou périmées restent refusées. Les tests Go complets, concurrence et analyse statique ont été réexécutés après cette correction. Un second live Docker a réussi : huit fragments H.264/AAC, lecture identique A/B, droits et ordre vérifiés ([preuve après correction](preuves/live-horloge-audio-2026-10-26.json)). La CI finale doit être consultée pour son résultat navigateur. Ce défaut ne permet pas d'attribuer rétrospectivement tous les anciens refus 409 ou 502 à une cause unique.
+
 ## Reproduire les tests
 
 Depuis un environnement de validation, pas pendant un direct à conserver :
