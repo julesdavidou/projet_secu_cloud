@@ -43,11 +43,3 @@ Les anciens ZIP nommés « correctif » ne sont pas une dépendance d'un nouveau
 7. Arrêter la diffusion dans OBS et laisser la commande vider sa file. Le direct terminé peut être relu depuis le début tant que ses blocs restent accessibles.
 
 Les commandes de tests de résilience créent des médias, modifient leurs propres objets de test et redémarrent certains services. Elles sont destinées à un banc de validation, pas à une démonstration en cours.
-
-## Avant de rendre le projet
-
-- Rendre le dépôt et le SHA de main, avec ce guide comme point d'entrée.
-- Joindre les preuves de tests et les mesures avec leur contexte ; ne pas afficher « testé sur Raspberry Pi » pour une exécution ARM64 sous QEMU.
-- Conserver séparément les paquets privés et sauvegardes si une démo doit être rejouée.
-- Lire les limites : pas de réplication automatique, pas de paiement réel, pas de garantie de latence, pas de validation de sécurité mathématique complète du profil cryptographique.
-- Ne jamais joindre une archive globale contenant les mots de passe SSH, les clés ou les comptes des autres participants.
